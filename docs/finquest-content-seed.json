@@ -1,0 +1,373 @@
+{
+  "schemaVersion": "1.0",
+  "title": "FinQuest Content Seed — Batch 1",
+  "source": "PRD-FinQuest改版-2026-09-19.md §10 (Rev 2)",
+  "date": "2026-09-19",
+  "batch": 1,
+  "notes": [
+    "Three collections per PRD §10.1-10.3: termCards, productionItems, interviewCards.",
+    "select_ja items (pi_13) extend the base schema with an optional 'options' array (4 choices) for the mobile-degraded selection mode (PRD §10.2 / US-4 AC1).",
+    "Scoring per PRD §11: normalize (trim, full/half-width, case), then match against 'accepted' (incl. variants). Read-aloud has no machine grading.",
+    "Batch 1 scope = P&L core cards + type EN/JA production + interview cards; includes a few ratio/B/S cards that repeat in Batch 2.",
+    "Implementations must load content from this file; do not hardcode in game.js (PRD §10.4)."
+  ],
+  "termCards": [
+    {
+      "id": "tc_revenue",
+      "ja": "売上高",
+      "en": "Revenue",
+      "enAlt": ["Net sales", "Sales", "Turnover"],
+      "jaUsage": "今期の売上高は前年比で8%増加しました。",
+      "enUsage": "Revenue came in at this level for the period, up 8% year on year.",
+      "context": "P&L",
+      "readAloudHint": "revenue 重音在第一音节：REV-en-ue，不是 rev-EN-ue。",
+      "etymologyNote": "Revenue ← re- + venire（回来）：流回公司的钱（P2）。",
+      "wrongPairWarning": "売上高（sales 收入）≠ 売掛金（accounts receivable，资产负债表科目）。"
+    },
+    {
+      "id": "tc_cogs",
+      "ja": "売上原価",
+      "en": "Cost of sales",
+      "enAlt": ["Cost of goods sold", "COGS"],
+      "jaUsage": "売上原価は売上高に対応する直接コストです。",
+      "enUsage": "Cost of sales captures the direct costs tied to the goods or services sold.",
+      "context": "P&L",
+      "readAloudHint": "COGS 按字母逐个读 C-O-G-S，或说全称 cost of goods sold。",
+      "etymologyNote": "COGS 是 Cost of Goods Sold 的缩写（P2）。",
+      "wrongPairWarning": "売上原価（cost of sales）≠ 仕入原価（purchase cost，未含库存调整）。"
+    },
+    {
+      "id": "tc_gross_profit",
+      "ja": "売上総利益",
+      "en": "Gross profit",
+      "enAlt": ["Gross income"],
+      "jaUsage": "売上総利益は売上高から売上原価を引いたものです。",
+      "enUsage": "Gross profit is revenue minus cost of sales.",
+      "context": "P&L",
+      "readAloudHint": "gross 的 /s/ 要发清楚：gross profit，别吞音。",
+      "etymologyNote": "gross = 总的、未扣减的，与 net 相对（P2）。",
+      "wrongPairWarning": "gross profit（毛利，绝对额）≠ gross margin（毛利率，比率 = 毛利÷收入）。"
+    },
+    {
+      "id": "tc_sga",
+      "ja": "販売費及び一般管理費",
+      "en": "SG&A expenses",
+      "enAlt": ["Selling, general and administrative expenses", "SG&A"],
+      "jaUsage": "販管費には人件費や広告費などが含まれます。",
+      "enUsage": "SG&A covers selling and administrative costs such as salaries and advertising.",
+      "context": "P&L",
+      "readAloudHint": "SG&A 按字母读：S-G-and-A（簡略して SG&A）。",
+      "etymologyNote": "SG&A 是 Selling, General and Administrative 的缩写（P2）。",
+      "wrongPairWarning": "販管費（SG&A，期间费用）≠ 売上原価（COGS，产品成本）。"
+    },
+    {
+      "id": "tc_operating_profit",
+      "ja": "営業利益",
+      "en": "Operating profit",
+      "enAlt": ["Operating income", "EBIT"],
+      "jaUsage": "営業利益は本業の儲けを示します。",
+      "enUsage": "Operating profit measures the profitability of the core business.",
+      "context": "P&L",
+      "readAloudHint": "operating 发 /ɒp/: OP-er-ating，重音在第一音节。",
+      "etymologyNote": "operate ← opus（工作）+ -ate：经营活动产生（P2）。",
+      "wrongPairWarning": "営業利益（operating profit）≠ 経常利益（ordinary profit）：后者含经常性营业外收支。"
+    },
+    {
+      "id": "tc_non_operating",
+      "ja": "営業外収益・費用",
+      "en": "Non-operating income and expenses",
+      "enAlt": ["Non-operating items", "Other income and expense"],
+      "jaUsage": "営業外収益には受取利息や為替差益が含まれます。",
+      "enUsage": "Non-operating items include interest income, interest expense, and foreign exchange gains or losses.",
+      "context": "P&L",
+      "readAloudHint": "non-operating：non-op-er-at-ing，中间两个 o 要分开但连读自然。",
+      "etymologyNote": "operating 加前缀 non-：非经营性的（P2）。",
+      "wrongPairWarning": "営業外（经常性：利息、汇兑）≠ 特別損益（一次性：灾害损失、出售资产损益）。"
+    },
+    {
+      "id": "tc_ordinary_profit",
+      "ja": "経常利益",
+      "en": "Ordinary profit",
+      "enAlt": ["Ordinary income", "Recurring profit"],
+      "jaUsage": "経常利益は営業利益に営業外収益・費用を加減したものです。",
+      "enUsage": "Ordinary profit adds recurring non-operating items such as interest to operating profit.",
+      "context": "P&L",
+      "readAloudHint": "ordinary：OR-di-na-ry（美音可省一个音节：OR-di-nary）。",
+      "etymologyNote": "経常 = 经常、反复发生；ordinary = 平常的、经常的（P2）。",
+      "wrongPairWarning": "経常利益是日本报表特有小计（J-GAAP convention）；US GAAP/IFRS 无此单列科目——对外企面试必补这句。"
+    },
+    {
+      "id": "tc_extraordinary",
+      "ja": "特別利益・損失",
+      "en": "Extraordinary items",
+      "enAlt": ["Extraordinary gains and losses"],
+      "jaUsage": "特別損益は一時的な利益や損失を表します。",
+      "enUsage": "Extraordinary items are one-off gains and losses outside normal operations.",
+      "context": "P&L",
+      "readAloudHint": "extraordinary：ex-TRA-or-di-na-ry，五个音节别吞。",
+      "etymologyNote": "extra-（超出）+ ordinary（平常）：超出日常的（P2）。",
+      "wrongPairWarning": "US GAAP 自 2015 年起取消 extraordinary items 独立分类；日本报表仍保留，只有 discontinued operations 在美式报表单列。"
+    },
+    {
+      "id": "tc_tax",
+      "ja": "法人税等",
+      "en": "Income tax expense",
+      "enAlt": ["Income taxes", "Corporate tax"],
+      "jaUsage": "法人税等を差し引いて当期純利益になります。",
+      "enUsage": "After income tax expense, we arrive at net profit.",
+      "context": "P&L",
+      "readAloudHint": "income tax：IN-come tax，重音在第一个词。",
+      "etymologyNote": "法人 = legal person / corporation；法人税 = corporate tax（P2）。",
+      "wrongPairWarning": "法人税等（income tax，利润表）≠ 消費税（consumption tax，不在利润链条上）。"
+    },
+    {
+      "id": "tc_net_profit",
+      "ja": "当期純利益",
+      "en": "Net profit",
+      "enAlt": ["Net income", "Profit for the period"],
+      "jaUsage": "当期純利益は損益計算書の最終行です。",
+      "enUsage": "Net profit is the bottom line of the income statement.",
+      "context": "P&L",
+      "readAloudHint": "net 发短音 /e/：NET profit。",
+      "etymologyNote": "net = 净、扣除之后的，与 gross 相对（P2）。",
+      "wrongPairWarning": "当期純利益（net profit，P&L 科目）≠ 利益剰余金（retained earnings，B/S 科目）≠ 純資産（equity）。"
+    },
+    {
+      "id": "tc_roe",
+      "ja": "自己資本利益率",
+      "en": "ROE",
+      "enAlt": ["Return on Equity"],
+      "jaUsage": "自己資本利益率（ROE）は当期純利益を自己資本で割ったものです。",
+      "enUsage": "ROE measures the return a company generates on shareholders' equity.",
+      "context": "Ratio",
+      "readAloudHint": "ROE 按字母读 R-O-E，或说全称 Return on Equity。",
+      "etymologyNote": "equity = 股东持有部分；return = 回报（P2）。",
+      "wrongPairWarning": "ROE（净利润÷股东权益）≠ ROA（净利润÷总资产）。"
+    },
+    {
+      "id": "tc_roa",
+      "ja": "総資産利益率",
+      "en": "ROA",
+      "enAlt": ["Return on Assets"],
+      "jaUsage": "総資産利益率（ROA）は資産全体への投資効率を示します。",
+      "enUsage": "ROA shows how efficiently total assets generate profit.",
+      "context": "Ratio",
+      "readAloudHint": "ROA 按字母读 R-O-A，或说全称 Return on Assets。",
+      "etymologyNote": "asset + 复数 assets = 资产；return = 回报（P2）。",
+      "wrongPairWarning": "ROA ≠ ROE：ROA 分母是总资产，ROE 分母是股东权益。"
+    },
+    {
+      "id": "tc_current_ratio",
+      "ja": "流動比率",
+      "en": "Current ratio",
+      "enAlt": ["Working capital ratio"],
+      "jaUsage": "流動比率は流動資産を流動負債で割ったものです。",
+      "enUsage": "The current ratio is current assets divided by current liabilities.",
+      "context": "Ratio",
+      "readAloudHint": "current 发 /ˈkɜːr-ənt/：CUR-rent，不是 CURR-ent。",
+      "etymologyNote": "current = 流动的、当前的（P2）。",
+      "wrongPairWarning": "流動比率（current ratio）≠ 当座比率（quick ratio，剔除库存）。银行授信审查两者都看。"
+    },
+    {
+      "id": "tc_pe_ratio",
+      "ja": "株価収益率",
+      "en": "P/E ratio",
+      "enAlt": ["Price-to-earnings ratio", "Price earnings ratio", "PER"],
+      "jaUsage": "株価収益率（PER）は株価を一株当たり利益で割ったものです。",
+      "enUsage": "The P/E ratio is the share price divided by earnings per share.",
+      "context": "Ratio",
+      "readAloudHint": "P/E 按字母读 P-E，或说 price-to-earnings。",
+      "etymologyNote": "earnings = 收益（earn + -ings）（P2）。",
+      "wrongPairWarning": "PER/P-E（株価収益率）≠ PBR/P-B（株価純資産倍率，price-to-book）。時価総額 = market cap。"
+    },
+    {
+      "id": "tc_equity_ratio",
+      "ja": "自己資本比率",
+      "en": "Equity ratio",
+      "enAlt": ["Shareholders' equity ratio"],
+      "jaUsage": "自己資本比率は総資産に占める自己資本の割合です。",
+      "enUsage": "The equity ratio is shareholders' equity divided by total assets.",
+      "context": "B/S",
+      "readAloudHint": "equity 发 /ˈek-wə-ti/：EQ-ui-ty。",
+      "etymologyNote": "equity ← 拉丁 aequus（对等、公平）（P2）。",
+      "wrongPairWarning": "自己資本比率（equity ratio）≠ 負債比率（debt ratio / D/E）。别和银行资本充足率 CAR（Basel）混为一谈。"
+    }
+  ],
+  "productionItems": [
+    {
+      "id": "pi_01",
+      "type": "type_en",
+      "cue": "请写出「收入」的英文术语。",
+      "cueJa": "「売上高」を英語で言うと？",
+      "accepted": ["Revenue", "Net sales", "Sales", "Turnover"],
+      "termCardId": "tc_revenue",
+      "feedback": "Revenue / Net sales 都可以，Turnover 是英式用法。注意与 accounts receivable（売掛金，表科目）区分。"
+    },
+    {
+      "id": "pi_02",
+      "type": "type_en",
+      "cue": "请写出「毛利」的英文术语。",
+      "cueJa": "「売上総利益」を英語で言うと？",
+      "accepted": ["Gross profit", "Gross income"],
+      "termCardId": "tc_gross_profit",
+      "feedback": "Gross profit = Revenue − Cost of sales。gross margin 是比率不是绝对额，别混。"
+    },
+    {
+      "id": "pi_03",
+      "type": "type_en",
+      "cue": "请写出「营业利润」的英文。",
+      "cueJa": "「営業利益」を英語で言うと？",
+      "accepted": ["Operating profit", "Operating income"],
+      "termCardId": "tc_operating_profit",
+      "feedback": "Operating profit = Gross profit − SG&A expenses，反映核心业务。"
+    },
+    {
+      "id": "pi_04",
+      "type": "type_en",
+      "cue": "请写出「经常利益」的英文（日本报表特有科目）。",
+      "cueJa": "「経常利益」を英語で言うと？",
+      "accepted": ["Ordinary profit", "Ordinary income", "Recurring profit"],
+      "termCardId": "tc_ordinary_profit",
+      "feedback": "Ordinary profit = operating profit ± non-operating items。US GAAP/IFRS 无此单列科目，讲外企要补一句 Japanese convention。"
+    },
+    {
+      "id": "pi_05",
+      "type": "type_en",
+      "cue": "请写出「当期纯利益（净利润）」的英文。",
+      "cueJa": "「当期純利益」を英語で言うと？",
+      "accepted": ["Net profit", "Net income", "Profit for the period"],
+      "termCardId": "tc_net_profit",
+      "feedback": "Net income 最常用。别和 retained earnings（利益剰余金，B/S 科目）混淆。"
+    },
+    {
+      "id": "pi_06",
+      "type": "type_ja",
+      "cue": "Revenue 的日文科目是什么？",
+      "cueJa": "Revenue の日本語の勘定科目は？",
+      "accepted": ["売上高"],
+      "termCardId": "tc_revenue",
+      "feedback": "売上高（净额口径对应 net sales）。"
+    },
+    {
+      "id": "pi_07",
+      "type": "type_ja",
+      "cue": "Gross profit 的日文科目是什么？",
+      "cueJa": "Gross profit の日本語の勘定科目は？",
+      "accepted": ["売上総利益"],
+      "termCardId": "tc_gross_profit",
+      "feedback": "売上総利益 = 売上高 − 売上原価。"
+    },
+    {
+      "id": "pi_08",
+      "type": "type_ja",
+      "cue": "Operating profit 的日文科目是什么？",
+      "cueJa": "Operating profit の日本語の勘定科目は？",
+      "accepted": ["営業利益"],
+      "termCardId": "tc_operating_profit",
+      "feedback": "営業利益 = 売上総利益 − 販管費。"
+    },
+    {
+      "id": "pi_09",
+      "type": "type_ja",
+      "cue": "Ordinary profit 的日文科目是什么？",
+      "cueJa": "Ordinary profit の日本語の勘定科目は？",
+      "accepted": ["経常利益"],
+      "termCardId": "tc_ordinary_profit",
+      "feedback": "経常利益 = 営業利益 ± 営業外収益・費用。你上次被问的重点科目。"
+    },
+    {
+      "id": "pi_10",
+      "type": "type_ja",
+      "cue": "Net income 的日文科目是什么？",
+      "cueJa": "Net income の日本語の勘定科目は？",
+      "accepted": ["当期純利益"],
+      "termCardId": "tc_net_profit",
+      "feedback": "当期純利益 = 損益計算書の最終行。"
+    },
+    {
+      "id": "pi_11",
+      "type": "type_en",
+      "cue": "「ROE」的全称（英文）是？",
+      "cueJa": "ROE の正式名称（英語）は？",
+      "accepted": ["Return on Equity", "Return on shareholders equity", "Return on shareholders' equity"],
+      "termCardId": "tc_roe",
+      "feedback": "ROE = Net profit ÷ Shareholders' equity。日本企业重视 ROE，是资本效率讨论的焦点。"
+    },
+    {
+      "id": "pi_12",
+      "type": "type_en",
+      "cue": "「株価収益率」的英文（缩写或全称）？",
+      "cueJa": "「株価収益率」を英語で言うと？",
+      "accepted": ["P/E ratio", "PER", "Price-to-earnings ratio", "Price earnings ratio", "Price to earnings ratio"],
+      "termCardId": "tc_pe_ratio",
+      "feedback": "P/E = Price ÷ EPS。别和 PBR（Price-to-book）混淆。"
+    },
+    {
+      "id": "pi_13",
+      "type": "select_ja",
+      "cue": "选出「流動比率」对应的英文术语：",
+      "cueJa": "「流動比率」に当たる英語用語を選んでください：",
+      "options": ["Current ratio", "Quick ratio", "Debt-to-equity ratio", "Return on Equity"],
+      "accepted": ["Current ratio", "Working capital ratio"],
+      "termCardId": "tc_current_ratio",
+      "feedback": "流動比率 = 流動資産 ÷ 流動負債。Quick ratio（当座比率）还要剔除库存，银行审查常用。"
+    }
+  ],
+  "interviewCards": [
+    {
+      "id": "ic_01",
+      "topic": "P&L 讲解",
+      "templateEn": "A P&L shows a company's revenue, expenses, and profit over a specific period. Walking down the statement: revenue of {revenue}, minus cost of sales gives gross profit, minus SG&A gives operating profit, and after non-operating items and tax we reach net profit.",
+      "templateJa": "損益計算書は、一定期間の収益・費用・利益を示します。売上高を起点に、売上原価を引いて売上総利益、販管費を引いて営業利益、さらに営業外損益と法人税等を調整して当期純利益になります。",
+      "vars": ["{revenue}", "{period}"],
+      "followUpEn": "Which line would you focus on to judge the quality of earnings, and why?",
+      "followUpJa": "収益の質を判断するなら、どの項目に注目しますか？その理由は？",
+      "keys": ["revenue", "gross profit", "operating profit", "net profit", "period"]
+    },
+    {
+      "id": "ic_02",
+      "topic": "営業利益 vs 経常利益（面试原题）",
+      "templateEn": "Operating profit comes from the core business: revenue minus cost of sales and SG&A. Ordinary profit additionally includes recurring non-operating items such as interest income and expense. In {company}, interest expense was the largest non-operating item.",
+      "templateJa": "営業利益は本業の利益、つまり売上高から売上原価と販管費を引いたものです。経常利益はそこに受取利息・支払利息などの経常的な営業外損益を加えたものです。{company}の場合、支払利息が最大の営業外費用でした。",
+      "vars": ["{company}"],
+      "followUpEn": "Under US GAAP, where would those items be shown?",
+      "followUpJa": "US GAAPでは、これらの項目はどこに表示されますか？",
+      "keys": ["operating profit", "ordinary profit", "non-operating", "interest", "Japanese convention", "US GAAP"]
+    },
+    {
+      "id": "ic_03",
+      "topic": "三表联动",
+      "templateEn": "The statements link through equity: net profit from the P&L flows into retained earnings on the balance sheet, increasing equity. The cash flow statement reconciles net profit to operating cash flow. For example, when {metric} grows, profit is recognized before cash is collected.",
+      "templateJa": "三表は自己資本でつながります。損益計算書の当期純利益は貸借対照表の利益剰余金に積み上がり、自己資本を増やします。キャッシュ・フロー計算書は当期純利益を営業キャッシュ・フローに調整します。例えば{metric}が増えると、利益は計上されても現金はまだ回収されていません。",
+      "vars": ["{metric}"],
+      "followUpEn": "If profit grows but operating cash flow declines, what is a likely cause?",
+      "followUpJa": "利益が伸びているのに営業CFが減る場合、原因として何が考えられますか？",
+      "keys": ["net profit", "retained earnings", "cash flow", "reconciliation", "working capital"]
+    },
+    {
+      "id": "ic_04",
+      "topic": "利润质量收尾（加分句）",
+      "templateEn": "Beyond the bottom line, I would compare {company}'s profit margins with the previous period and with peer companies to judge the quality and sustainability of earnings.",
+      "templateJa": "当期純利益だけでなく、{company}の利益率を前年および同業他社と比較して、収益の質と持続性を判断します。",
+      "vars": ["{company}"],
+      "followUpEn": "How do you tell whether an improvement is industry-driven or company-specific?",
+      "followUpJa": "改善が業界要因か、会社固有の要因かを分けるには何を比較しますか？",
+      "keys": ["margin", "year on year", "peer companies", "quality", "sustainability"]
+    },
+    {
+      "id": "ic_05",
+      "topic": "没有精确数字时的应答（救命句）",
+      "templateEn": "I don't have the exact figure at the moment, but my initial view is that {metric} came in around this level, based on {basis}. I would verify this using the company's IR materials or reliable industry data before finalizing.",
+      "templateJa": "今、正確な数字は持ち合わせていませんが、初期の見立てとしては{metric}はこの程度と見ています。根拠は{basis}です。最終的にはIR資料や信頼できる業界データで確認します。",
+      "vars": ["{metric}", "{basis}"],
+      "followUpEn": "How would you estimate it if the data were not available?",
+      "followUpJa": "データが無い場合、どう推定しますか？",
+      "keys": ["no exact figure", "initial view", "estimate", "IR materials", "verify"]
+    }
+  ],
+  "counts": {
+    "termCards": 15,
+    "productionItems": 13,
+    "interviewCards": 5
+  }
+}
