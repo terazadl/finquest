@@ -65,12 +65,19 @@
     state.saved.mistakes[key].count += 1;
     state.saved.mistakes[key].lastAt = Date.now();
     save();
+    refreshErrorCount();
   }
 
   function clearMistake(chapterId, uiIndex) {
     const key = qidOf(chapterId, uiIndex);
     if (state.saved.mistakes) delete state.saved.mistakes[key];
     save();
+    refreshErrorCount();
+  }
+
+  function refreshErrorCount() {
+    const el = $("#menu-error-count");
+    if (el) el.textContent = mistakeCount();
   }
 
   function mistakeCount() {
@@ -775,7 +782,7 @@
     const listWrap = $("#errorbook-list");
     const emptyEl = $("#errorbook-empty");
     const keys = Object.keys(state.saved.mistakes || {});
-    $("#menu-error-count").textContent = mistakeCount();
+    refreshErrorCount();
     if (keys.length === 0) {
       emptyEl.classList.remove("hidden");
       listWrap.innerHTML = "";
