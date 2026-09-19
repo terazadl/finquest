@@ -84,14 +84,27 @@
     return state.saved.mistakes ? Object.keys(state.saved.mistakes).length : 0;
   }
 
-  /* 按错题记录还原题目对象（含解析信息） */
+  /* 按错题记录还原题目对象（含解析信息）
+   * 支持两态：
+   *  - 章节题: "pl:3" → DATA 里的对象（无 accepted）
+   *  - 产出题: "prod:pi_01" → seed 里的 ProductionItem（无 chain options 语义）
+   */
   function questionFromKey(key) {
-    const [chapterId, ui] = key.split(":");
+    const idx = key.indexOf(":");
+    const chapterId = key.slice(0, idx);
+    const rest = key.slice(idx + 1);
+    if (chapterId === "prod") {
+      return FinSeedLoader.ready().then(function ({ data }) {
+        const p = (data.productionItems || []).find(function (x) { return x.id === rest; });
+        if (!p) return null;
+        return { chapterId: "prod", uiIndex: rest, isProd: true, ...p };
+      });
+    }
     const ch = CHAPTERS.find((c) => c.id === chapterId);
     if (!ch) return null;
-    const q = ch.questions[Number(ui)];
+    const q = ch.questions[Number(rest)];
     if (!q) return null;
-    return { chapterId, uiIndex: Number(ui), ...q };
+    return { chapterId, uiIndex: Number(rest), ...q };
   }
 
   /* ---------- 通用工具 ---------- */
@@ -188,31 +201,117 @@
     renderQuestion();
   }
 
-  /* 考前突击：只刷错题，答对则清除 */
+  /* 考前突击：只刷错题，答对则清除（含产出题） */
   function startReviewMode() {
     const keys = Object.keys(state.saved.mistakes || {});
     if (keys.length === 0) return;
-    const questions = keys
-      .map(questionFromKey)
-      .filter(Boolean)
-      .map((q) => ({
-        ...q,
-        shuffleOptions: shuffle(q.options.map((t, ti) => ({ t, ti }))),
-      }));
-    if (questions.length === 0) return;
-    const ch = CHAPTERS.find((c) => c.id === questions[0].chapterId);
-    quiz = {
-      chapterId: "review",
-      reviewMode: true,
-      questions,
-      index: 0,
-      correct: 0,
-      total: questions.length,
-      done: new Set(),
-    };
-    $("#quiz-title").textContent = "考前突击 · 错题";
-    showScreen("screen-quiz");
-    renderQuestion();
+    Promise.all(keys.map(questionFromKey)).then(function (resolved) {
+      const questions = resolved
+        .filter(Boolean)
+        .map(function (q) {
+          if (q.isProd) return q;
+          return {
+            ...q,
+            shuffleOptions: shuffle(q.options.map((t, ti) => ({ t, ti }))),
+          };
+        });
+      if (questions.length === 0) return;
+      quiz = {
+        chapterId: "review",
+        reviewMode: true,
+        questions,
+        index: 0,
+        correct: 0,
+        total: questions.length,
+        done: new Set(),
+      };
+      $("#quiz-title").textContent = "考前突击 · 错题";
+      showScreen("screen-quiz");
+      renderQuestion();
+    });
+  }
+
+  /* 考前突击：产出题（错题里的 Type EN / Type JA / Select JA） */
+  function renderReviewProd(q) {
+    const card = $("#question-card");
+    const typeLabel =
+      q.type === "type_en" ? "⌨️ 打出英文" : q.type === "type_ja" ? "⌨️ 打出日文" : "👇 选答案";
+    card.innerHTML =
+      '<span class="q-tag">📕 错题 · 产出 · ' + typeLabel + "</span>" +
+      '<div class="q-text">' + esc(q.cue) + "</div>" +
+      (q.cueJa ? '<div class="prod-hint">🇯🇵 ' + esc(q.cueJa) + "</div>" : "") +
+      '<div class="prod-input-area"></div>' +
+      '<div class="shortcut-hint' + (q.type === "select_ja" ? "" : "") + '" style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px">答对自动移出错题本 · <kbd>Enter</kbd> 提交 · <kbd>Esc</kbd> 退出</div>';
+    const area = $(".prod-input-area", card);
+    if (q.type === "select_ja") {
+      const optWrap = document.createElement("div");
+      optWrap.className = "prod-options";
+      (q.options || []).forEach(function (opt) {
+        const btn = document.createElement("button");
+        btn.className = "q-option";
+        btn.textContent = opt;
+        btn.dataset.oi = opt;
+        btn.addEventListener("click", function () {
+          submitReviewProd(q, btn, opt);
+        });
+        optWrap.appendChild(btn);
+      });
+      area.appendChild(optWrap);
+    } else {
+      const inputWrap = document.createElement("div");
+      inputWrap.className = "prod-input-wrap";
+      inputWrap.innerHTML =
+        '<input type="text" id="review-prod-input" placeholder="' +
+        (q.type === "type_en" ? "Type English…" : "日本語で入力…") +
+        '" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+        '<button class="prod-submit" id="review-prod-submit">提交</button>';
+      area.appendChild(inputWrap);
+      const input = $("#review-prod-input", card);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitReviewProd(q, null, input.value, true);
+        }
+      });
+      $("#review-prod-submit", card).addEventListener("click", function () {
+        submitReviewProd(q, null, input.value, true);
+      });
+      input.focus();
+    }
+  }
+
+  function submitReviewProd(q, btn, val, useJudge) {
+    let ok;
+    if (btn) {
+      ok = q.accepted.includes(btn.textContent);
+      const opts = $all(".q-option", $("#question-card"));
+      opts.forEach(function (b) {
+        b.disabled = true;
+        b.classList.toggle("correct", q.accepted.includes(b.textContent));
+        b.classList.toggle("wrong", b === btn && !ok);
+      });
+    } else if (useJudge) {
+      const judge = q.type === "type_ja" ? FinScore.judgeJa : FinScore.judgeEn;
+      const res = judge(val, q.accepted);
+      ok = res.ok;
+      const input = $("#review-prod-input");
+      if (input) input.disabled = true;
+    }
+    if (ok) {
+      quiz.done.add(q.uiIndex);
+      quiz.correct += 1;
+      clearMistake(q.chapterId, q.uiIndex);
+    }
+    const fb = $("#feedback-card");
+    fb.classList.remove("hidden");
+    $("#feedback-verdict").textContent = ok ? "✅ 答对了，移出错题本" : "❌ 还没过关";
+    $("#feedback-verdict").className = "feedback-verdict " + (ok ? "good" : "bad");
+    $("#feedback-explain").textContent = q.feedback || "参考答案：" + q.accepted.join(" / ");
+    $("#feedback-en").innerHTML = "<b>参考答案</b>" + q.accepted.join(" / ");
+    fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const last = quiz.index === quiz.total - 1;
+    $("#feedback-next").textContent = last ? "查看结果" : "下一题";
+    $("#feedback-next").onclick = last ? finishChapter : nextQuestion;
   }
 
   function renderQuestion() {
@@ -223,6 +322,10 @@
     const card = $("#question-card");
 
     if (quiz.reviewMode) {
+      if (q.isProd) {
+        renderReviewProd(q);
+        return;
+      }
       card.innerHTML =
         '<span class="q-tag">📕 错题 · ' + q.tag + "</span>" +
         '<div class="q-text">' + q.q + "</div>" +
@@ -455,6 +558,7 @@
       timer: 60,
       interval: null,
       wrongFlash: null,
+      lastMove: null, // { ti, pi } 最近一次放置，供撤销
     };
     showScreen("screen-chain-game");
     renderChain();
@@ -462,6 +566,7 @@
   }
 
   function renderChain() {
+    chain.lastMove = null;
     const hintMap = {
       en: "把英文损益表科目按正确顺序放入槽位",
       jp: "把日文损益表科目按正确顺序放入槽位",
@@ -506,6 +611,7 @@
 
     $("#chain-result").classList.add("hidden");
     $("#chain-timer").textContent = chain.timer + "s";
+    refreshUndoButton();
   }
 
   /* 点击槽位：选中或取消选中；已填的槽位点击 = 退回卡片 */
@@ -597,10 +703,49 @@
 
   function wireSlot(ti, pi, cardEl) {
     chain.assigned[ti] = pi;
+    chain.lastMove = { ti, pi };
+    refreshUndoButton();
     cardEl.classList.add("used");
     if (!checkPlacement(ti)) {
       flashWrong(pi, cardEl, ti);
     }
+  }
+
+  /* Track A：显式「撤回上一步」——可见、可发现，不隐藏在交互细节里 */
+  function refreshUndoButton() {
+    const btn = $("#chain-undo");
+    if (!btn) return;
+    const hasMove = chain && chain.lastMove && chain.assigned[chain.lastMove.ti] === chain.lastMove.pi;
+    btn.classList.toggle("hidden", !hasMove);
+  }
+
+  function undoLastMove() {
+    if (!chain || !chain.lastMove) return;
+    const { ti, pi } = chain.lastMove;
+    /* 若该位置已被后续操作覆盖（不该发生），退回仍按 lastMove 恢复卡片可用性 */
+    if (chain.assigned[ti] === pi) {
+      chain.assigned[ti] = null;
+      const cardEl = $('.chain-card[data-pi="' + pi + '"]', $("#chain-pool"));
+      if (cardEl) cardEl.classList.remove("used", "wrong-flash");
+      const slot = $('.chain-slot[data-ti="' + ti + '"]', $("#chain-targets"));
+      if (slot) {
+        slot.classList.remove("filled", "wrong", "active");
+        const t = chain.targets[ti];
+        if (chain.mode === "bs") {
+          slot.innerHTML = "<b>" + t.name + "</b><span class='slot-sub'>点击选中，再从下方卡片放入</span>";
+        } else if (chain.mode === "match") {
+          slot.innerHTML = "<b class='slot-name'>" + t.name + "</b><span class='slot-sub'>点击选中 ↓</span>";
+        } else {
+          slot.textContent = "↓ 第 " + (ti + 1) + " 位（点击选中）";
+        }
+        slot.addEventListener("click", () => selectSlot(ti));
+      }
+    }
+    chain.lastMove = null;
+    chain.activeSlot = -1;
+    showTemporaryHint("↩️ 已撤回上一步，可以重新放置");
+    refreshUndoButton();
+    syncSlotViews();
   }
 
   function checkPlacement(ti) {
@@ -623,17 +768,30 @@
   function flashWrong(pi, cardEl, ti) {
     cardEl.classList.add("wrong-flash");
     const targetItem = chain.pool[pi];
+    const t = chain.targets[ti];
+    let msg = "";
     if (chain.mode === "bs") {
       const bs = BS_ITEMS.find((it) => it.jp + " · " + it.en === targetItem);
       if (bs) {
         const correctSide = bs.side === "asset" ? "資産" : "負債・純資産";
-        showTemporaryHint("❌ 「" + bs.jp + "」属于「" + correctSide + "」");
+        msg = "❌ 「" + bs.jp + "」属于「" + correctSide + "」，不是「" + t.name + "」";
       }
+    } else if (chain.mode === "match") {
+      msg =
+        "❌ 第 " + (ti + 1) + " 位「" + t.name + "」应对应「" + t.expect + "」，不是「" + targetItem + "」";
+    } else {
+      /* en / jp：该槽位（order=ti）对应的正确科目名 */
+      const correct = chain.targets.find((x) => x.order === t.order);
+      msg =
+        "❌ 第 " + (ti + 1) + " 位应该是「" + correct.name + "」，不是「" + targetItem + "」。点「↩️ 撤回上一步」重放";
     }
+    if (msg) showTemporaryHint(msg);
     setTimeout(() => {
       cardEl.classList.remove("wrong-flash");
-      if (chain.mode === "bs") showTemporaryHint("判断科目属于哪一边，答错会提示正确答案");
-    }, 1500);
+      if (chain.mode === "bs") showTemporaryHint("判断科目属于哪一边，答错会提示正确答案；可用撤销重放");
+      else if (chain.mode === "match") showTemporaryHint("点击英文术语，放入对应的日文科目下方；答错可用撤销重放");
+      else showTemporaryHint("把科目按正确顺序放入槽位；答错会提示正确配对，可用撤销重放");
+    }, 2500);
   }
 
   function showTemporaryHint(msg) {
@@ -666,6 +824,8 @@
   function checkWin() {
     if (chain.assigned.every((v) => v !== null)) {
       clearInterval(chain.interval);
+      chain.lastMove = null;
+      refreshUndoButton();
       const allOk = chain.targets.every((_, ti) => checkPlacement(ti));
       showChainResult(allOk, allOk ? "🎉 链条拼搭完成！" : "完成，但有放错的位置");
       if (allOk) addXp(10);
@@ -794,26 +954,41 @@
     $("#btn-review-mode").disabled = false;
     $("#btn-review-mode").style.opacity = "1";
     listWrap.innerHTML = "";
-    const entries = keys
-      .map((key) => ({
-        key,
-        ...questionFromKey(key),
-        info: state.saved.mistakes[key],
-      }))
-      .filter((e) => e.q)
-      .sort((a, b) => b.info.count - a.info.count);
-    entries.forEach((e) => {
-      const row = document.createElement("div");
-      row.className = "error-row";
-      const chName = CHAPTERS.find((c) => c.id === e.chapterId)?.name || "";
-      row.innerHTML =
-        '<div class="error-row-head">' +
-        '<span class="error-row-chapter">' + chName + "</span>" +
-        '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
-        "</div>" +
-        '<div class="error-row-q">' + e.q + "</div>" +
-        '<div class="error-row-answer">✅ ' + e.en + "</div>";
-      listWrap.appendChild(row);
+    Promise.all(keys.map(function (key) {
+      return Promise.resolve(questionFromKey(key)).then(function (q) {
+        return q ? { key, ...q, info: state.saved.mistakes[key] } : null;
+      });
+    })).then(function (entries) {
+      entries = entries
+        .filter(Boolean)
+        .sort(function (a, b) { return b.info.count - a.info.count; });
+      entries.forEach(function (e) {
+        const row = document.createElement("div");
+        row.className = "error-row";
+        if (e.isProd) {
+          const typeLabel =
+            e.type === "type_en" ? "⌨️ 产出·英文" : e.type === "type_ja" ? "⌨️ 产出·日文" : "👇 产出·选择";
+          row.innerHTML =
+            '<div class="error-row-head">' +
+            '<span class="error-row-chapter">' + typeLabel + "</span>" +
+            '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
+            "</div>" +
+            '<div class="error-row-q">' + esc(e.cue) + "</div>" +
+            '<div class="error-row-answer">✅ ' + esc(e.accepted.join(" / ")) + "</div>" +
+            '<div class="error-row-en">考前突击会要求再产出（打字/选择），答对自动移出。</div>';
+          listWrap.appendChild(row);
+          return;
+        }
+        const chName = CHAPTERS.find((c) => c.id === e.chapterId)?.name || "";
+        row.innerHTML =
+          '<div class="error-row-head">' +
+          '<span class="error-row-chapter">' + chName + "</span>" +
+          '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
+          "</div>" +
+          '<div class="error-row-q">' + esc(e.q) + "</div>" +
+          '<div class="error-row-answer">✅ ' + esc(e.en || "") + "</div>";
+        listWrap.appendChild(row);
+      });
     });
   }
 
@@ -825,9 +1000,347 @@
     }
   }
 
+  /* ---------- Track B1 · 双语术语卡 ---------- */
+  let cardsFilter = "all";
+
+  function renderCards(filter) {
+    cardsFilter = filter || cardsFilter;
+    const wrap = $("#cards-list");
+    if (!wrap) return;
+    FinSeedLoader.ready().then(function ({ data, termMap }) {
+      wrap.innerHTML = "";
+      const list = (data.termCards || []).filter(function (c) {
+        return cardsFilter === "all" || c.context === cardsFilter;
+      });
+      if (list.length === 0) {
+        wrap.innerHTML = '<p class="errorbook-empty">该分类暂无术语卡。</p>';
+        return;
+      }
+      list.forEach(function (c) {
+        const card = document.createElement("div");
+        card.className = "term-card";
+        const alt = c.enAlt && c.enAlt.length ? " · " + c.enAlt.join(" / ") : "";
+        card.innerHTML =
+          '<div class="term-card-head">' +
+          '<span class="term-card-ja">' + esc(c.ja) + "</span>" +
+          '<span class="term-card-en">' + esc(c.en) + "</span>" +
+          (alt ? '<span class="term-card-alt">' + esc(alt) + "</span>" : "") +
+          "</div>" +
+          '<div class="term-card-usages">' +
+          '<div class="term-usage lang-ja">🇯🇵&nbsp; ' + esc(c.jaUsage) + "</div>" +
+          '<div class="term-usage lang-en">🇬🇧&nbsp; ' + esc(c.enUsage) + "</div>" +
+          "</div>" +
+          '<div class="term-card-hints">' +
+          '<div class="term-hint-read">🎧 读音：' + esc(c.readAloudHint || "") + "</div>" +
+          (c.wrongPairWarning
+            ? '<div class="term-hint-warn">⚠️ ' + esc(c.wrongPairWarning) + "</div>"
+            : "") +
+          "</div>" +
+          (c.etymologyNote
+            ? '<div class="term-etymology">' +
+              '<button class="term-etymology-toggle" data-etym="' + c.id + '">📖 词源小注（可选）</button>' +
+              '<div class="term-etymology-body hidden" data-etym-body="' + c.id + '">' +
+              esc(c.etymologyNote) +
+              "</div></div>"
+            : "");
+        wrap.appendChild(card);
+      });
+      /* 词源折叠 */
+      $all(".term-etymology-toggle", wrap).forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          const body = $('[data-etym-body="' + btn.dataset.etym + '"]', wrap);
+          if (body) body.classList.toggle("hidden");
+        });
+      });
+    });
+  }
+
+  /* ---------- Track B2 · 产出训练（打字） ---------- */
+  let prod = null; // { items, index, correct, total }
+
+  function startProduction() {
+    FinSeedLoader.ready().then(function ({ data }) {
+      const all = data.productionItems || [];
+      if (all.length === 0) return;
+      const items = shuffle(all).slice(0, 6);
+      prod = { items, index: 0, correct: 0, total: items.length };
+      $("#prod-progress").textContent = "1/" + items.length;
+      showScreen("screen-production");
+      renderProductionQ();
+    });
+  }
+
+  function renderProductionQ() {
+    if (!prod) return;
+    const item = prod.items[prod.index];
+    $("#prod-progress").textContent = prod.index + 1 + "/" + prod.total;
+    $("#prod-feedback").classList.add("hidden");
+    $("#prod-done").classList.add("hidden");
+    const card = $("#prod-question");
+    const typeLabel =
+      item.type === "type_en"
+        ? "⌨️ 打出英文"
+        : item.type === "type_ja"
+          ? "⌨️ 打出日文"
+          : "👇 选答案";
+    card.innerHTML =
+      '<span class="q-tag">' + typeLabel + (item.termCardId ? " · " + esc(item.termCardId) : "") + "</span>" +
+      '<div class="q-text">' + esc(item.cue) + "</div>" +
+      (item.cueJa ? '<div class="prod-hint">🇯🇵 ' + esc(item.cueJa) + "</div>" : "") +
+      '<div class="prod-input-area"></div>';
+    const area = $(".prod-input-area", card);
+    if (item.type === "select_ja") {
+      const optWrap = document.createElement("div");
+      optWrap.className = "prod-options";
+      (item.options || []).forEach(function (opt, i) {
+        const btn = document.createElement("button");
+        btn.className = "q-option";
+        btn.textContent = opt;
+        btn.dataset.oi = i;
+        btn.addEventListener("click", function () {
+          finishProductionItem(btn, opt);
+        });
+        optWrap.appendChild(btn);
+      });
+      area.appendChild(optWrap);
+    } else {
+      const inputWrap = document.createElement("div");
+      inputWrap.className = "prod-input-wrap";
+      inputWrap.innerHTML =
+        '<input type="text" id="prod-input" placeholder="' +
+        (item.type === "type_en" ? "Type English…" : "日本語で入力…") +
+        '" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text">' +
+        '<button class="prod-submit" id="prod-submit">提交</button>';
+      area.appendChild(inputWrap);
+      const input = $("#prod-input", area);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitProduction(input);
+        }
+      });
+      $("#prod-submit", area).addEventListener("click", function () {
+        submitProduction(input);
+      });
+      input.focus();
+    }
+  }
+
+  function submitProduction(input) {
+    const item = prod.items[prod.index];
+    const value = input.value;
+    if (!value.trim()) return;
+    const judge =
+      item.type === "type_ja" ? FinScore.judgeJa : FinScore.judgeEn;
+    const res = judge(value, item.accepted);
+    finishProductionItem(null, null, res);
+  }
+
+  /* 结算一道产出题：标记选项（select 模式）、反馈、朗读对照、错题记录 */
+  function finishProductionItem(btn, opt, res) {
+    const item = prod.items[prod.index];
+    if (btn) {
+      const opts = $all(".q-option", $("#prod-question"));
+      opts.forEach(function (b) {
+        b.disabled = true;
+        b.classList.toggle("correct", item.accepted.includes(b.textContent));
+        b.classList.toggle("wrong", b === btn && !item.accepted.includes(opt));
+      });
+    }
+    const ok = res ? res.ok : item.accepted.includes(opt);
+    if (ok) prod.correct += 1;
+
+    const fb = $("#prod-feedback");
+    fb.classList.remove("hidden");
+    const verdict = $("#prod-verdict");
+    verdict.textContent = ok ? "✅ 正确" : "❌ 有偏差";
+    verdict.className = "feedback-verdict " + (ok ? "good" : "bad");
+    $("#prod-explain").textContent = item.feedback || "";
+    const correctLine = $("#prod-correct-line");
+    if (!ok) {
+      correctLine.classList.remove("hidden");
+      correctLine.textContent = "参考答案：" + item.accepted.join(" / ");
+      recordMistake("prod", item.id);
+    } else {
+      correctLine.classList.add("hidden");
+    }
+    /* 朗读对照：挂对应术语卡 */
+    renderReadAloud(item.termCardId);
+    fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    const last = prod.index === prod.total - 1;
+    $("#prod-next").textContent = last ? "查看结果" : "下一题";
+    $("#prod-next").onclick = last ? finishProduction : nextProduction;
+  }
+
+  /* 朗读对照（Track B2 Read-aloud mirror）：先给提示，展开后才显示文稿 */
+  function renderReadAloud(termCardId) {
+    const box = $("#prod-readaloud");
+    if (!box) return;
+    FinSeedLoader.ready().then(function ({ termMap }) {
+      const c = termMap[termCardId];
+      if (!c) {
+        box.innerHTML = "";
+        return;
+      }
+      box.innerHTML =
+        '<div class="readaloud-hint">🎧 朗读对照：先自己读一遍下面的标准句（可打开文稿逐句自检）。不朗读也能通关。</div>' +
+        '<button class="readaloud-toggle" id="ra-toggle">👁️ 展开标准文稿对照</button>' +
+        '<div class="readaloud-text hidden" id="ra-text">' +
+        '<div class="readaloud-sentence"><span class="sen-label">EN</span>' + esc(c.enUsage) + "</div>" +
+        '<div class="readaloud-sentence"><span class="sen-label">JA</span>' + esc(c.jaUsage) + "</div>" +
+        (c.readAloudHint
+          ? '<div class="readaloud-hint" style="margin-top:8px">🎧 ' + esc(c.readAloudHint) + "</div>"
+          : "") +
+        "</div>";
+      $("#ra-toggle", box).addEventListener("click", function () {
+        $("#ra-text", box).classList.toggle("hidden");
+      });
+    });
+  }
+
+  function nextProduction() {
+    prod.index += 1;
+    renderProductionQ();
+  }
+
+  function finishProduction() {
+    $("#prod-question").classList.add("hidden");
+    $("#prod-feedback").classList.add("hidden");
+    $("#prod-done").classList.remove("hidden");
+    const gained = prod.correct * 8;
+    addXp(gained);
+    $("#prod-score").innerHTML =
+      "打出正确 " + prod.correct + " / " + prod.total +
+      " 题，获得 <b>+" + gained + "</b> 经验。" +
+      "<br>答错的题已进错题本，考前突击会再看见。";
+    $("#prod-progress").textContent = prod.total + "/" + prod.total;
+    refreshPlayer();
+  }
+
+  /* ---------- Track B3 · 面试演练（模板卡 + 朗读对照） ---------- */
+  let interview = null; // { items, index, done, total }
+
+  function startInterview() {
+    FinSeedLoader.ready().then(function ({ data }) {
+      const all = data.interviewCards || [];
+      if (all.length === 0) return;
+      const items = shuffle(all).slice(0, 3);
+      interview = { items, index: 0, done: 0, total: items.length };
+      $("#iv-progress").textContent = "1/" + items.length;
+      showScreen("screen-interview");
+      renderInterviewQ();
+    });
+  }
+
+  function renderInterviewQ() {
+    if (!interview) return;
+    const card = interview.items[interview.index];
+    $("#iv-progress").textContent = interview.index + 1 + "/" + interview.total;
+    $("#iv-done").classList.add("hidden");
+    const wrap = $("#iv-card");
+    wrap.classList.remove("hidden");
+    wrap.innerHTML =
+      '<span class="iv-topic">' + esc(card.topic) + "</span>" +
+      '<div class="iv-section-title">🟦 第一人称模板（EN）· 大声读出来，替换 {} 为真实场景</div>' +
+      '<div class="iv-template">' + escVars(card.templateEn) + "</div>" +
+      '<div class="iv-section-title">🟪 第一人称模板（JA）</div>' +
+      '<div class="iv-template">' + escVars(card.templateJa) + "</div>" +
+      '<div class="iv-section-title">🔧 变量示例</div>' +
+      '<div class="iv-vars-grid">' +
+      card.vars
+        .map(function (v) {
+          const ex = varExample(v);
+          return '<div class="iv-var-row"><b>' + esc(v) + "</b> → " + esc(ex) + "</div>";
+        })
+        .join("") +
+      "</div>" +
+      '<div class="iv-section-title">❓ 追问（Follow-up）</div>' +
+      '<div class="iv-followup">EN：' + esc(card.followUpEn) + "<br>JA：" + esc(card.followUpJa) + "</div>" +
+      '<div class="readaloud-box">' +
+      '<div class="readaloud-hint">🎧 朗读对照：读 EN 或 JA 一句，展开文稿逐字自检。</div>' +
+      '<button class="readaloud-toggle" id="iv-ra-toggle">👁️ 展开文稿对照</button>' +
+      '<div class="readaloud-text hidden" id="iv-ra-text">' +
+      '<div class="readaloud-sentence"><span class="sen-label">EN</span>' + esc(card.templateEn) + "</div>" +
+      '<div class="readaloud-sentence"><span class="sen-label">JA</span>' + esc(card.templateJa) + "</div>" +
+      "</div>" +
+      "</div>" +
+      '<div class="iv-actions">' +
+      '<button class="primary-btn" id="iv-done-btn">✅ 我朗读 / 说过了（自评）</button>' +
+      "</div>";
+    $("#iv-ra-toggle", wrap).addEventListener("click", function () {
+      $("#iv-ra-text", wrap).classList.toggle("hidden");
+    });
+    $("#iv-done-btn", wrap).addEventListener("click", function () {
+      interview.done += 1;
+      const last = interview.index === interview.total - 1;
+      if (last) {
+        finishInterview();
+      } else {
+        wrap.classList.add("hidden");
+        interview.index += 1;
+        renderInterviewQ();
+      }
+    });
+  }
+
+  function finishInterview() {
+    const iv = interview;
+    interview = null;
+    $("#iv-card").classList.add("hidden");
+    $("#iv-done").classList.remove("hidden");
+    /* 覆盖考点与关键概念汇总 */
+    const topics = iv.items.map(function (c) { return c.topic; }).join(" · ");
+    let keys = [];
+    iv.items.forEach(function (c) { keys = keys.concat(c.keys); });
+    const uniq = Array.from(new Set(keys)).slice(0, 12).join(" / ");
+    $("#iv-summary").innerHTML =
+      "完成 <b>" + iv.done + " / " + iv.total + "</b> 张模板卡。" +
+      "<br>覆盖考点：" + esc(topics) +
+      "<br>关键概念：" + esc(uniq) +
+      "<br>建议：回到「错题本」或「双语术语卡」巩固不熟的词。";
+    $("#iv-progress").textContent = iv.total + "/" + iv.total;
+  }
+
+  /* ---------- Track B · 展示辅助 ---------- */
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escVars(s) {
+    /* 高亮 {var} */
+    return esc(s).replace(/\{([^}]+)\}/g, '<span class="var">{' + "$1" + "}</span>");
+  }
+
+  function varExample(v) {
+    const ex = {
+      "{period}": "last fiscal year (前期)",
+      "{metric}": "gross margin (売上総利益率)",
+      "{company}": "our company / 当社",
+      "{revenue}": "approximately 5 billion yen",
+      "{basis}": "industry reports & peer comparisons",
+    };
+    return ex[v] || v + "（换成实际值）";
+  }
+
+
   /* ---------- 快捷键 ---------- */
   function handleKeydown(e) {
     const active = document.querySelector(".screen.active")?.id;
+    if (active === "screen-production" && e.key === "Escape") {
+      prod = null;
+      showScreen("screen-menu");
+      return;
+    }
+    if (active === "screen-interview" && e.key === "Escape") {
+      interview = null;
+      showScreen("screen-menu");
+      return;
+    }
     if (active === "screen-quiz") {
       if (e.key === "Escape") {
         quiz = null;
@@ -871,6 +1384,9 @@
         if (target === "screen-chapters") renderChapters();
         if (target === "screen-warmup") startWarmup();
         if (target === "screen-errorbook") renderErrorBook();
+        if (target === "screen-cards") renderCards("all");
+        if (target === "screen-production") startProduction();
+        if (target === "screen-interview") startInterview();
         showScreen(target);
       });
     });
@@ -932,6 +1448,37 @@
         if (chain.interval) clearInterval(chain.interval);
         startChainGame(m);
       }
+    });
+
+    /* Track A：链条撤回上一步 */
+    $("#chain-undo").addEventListener("click", () => {
+      undoLastMove();
+    });
+
+    /* Track B1：术语卡筛选 */
+    $all("#cards-filter .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        $all("#cards-filter .seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        renderCards(btn.dataset.cfilter);
+      });
+    });
+
+    /* Track B2：产出训练退出 / 再练 */
+    $("#prod-back").addEventListener("click", () => {
+      prod = null;
+      showScreen("screen-menu");
+    });
+    $("#prod-again").addEventListener("click", () => {
+      startProduction();
+    });
+
+    /* Track B3：面试演练退出 / 再来 */
+    $("#iv-back").addEventListener("click", () => {
+      interview = null;
+      showScreen("screen-menu");
+    });
+    $("#iv-again").addEventListener("click", () => {
+      startInterview();
     });
 
     /* 重置进度 */

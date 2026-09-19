@@ -40,6 +40,21 @@
           <span class="menu-label">每日热身前 10 分钟</span>
           <span class="menu-sub">随机题 + 链条，面试前专用</span>
         </button>
+        <button class="menu-btn" data-goto="screen-cards">
+          <span class="menu-icon">📇</span>
+          <span class="menu-label">双语术语卡</span>
+          <span class="menu-sub">JA | EN | 各一句用法 · 朗读提示 · 易混警示</span>
+        </button>
+        <button class="menu-btn" data-goto="screen-production">
+          <span class="menu-icon">⌨️</span>
+          <span class="menu-label">产出训练 · 打字</span>
+          <span class="menu-sub">中文 cue 打出日/英术语，练「说得出」</span>
+        </button>
+        <button class="menu-btn" data-goto="screen-interview">
+          <span class="menu-icon">🎙️</span>
+          <span class="menu-label">面试演练 · 模板卡</span>
+          <span class="menu-sub">第一人称答句 + 追问 + 朗读对照</span>
+        </button>
         <button class="menu-btn" data-goto="screen-errorbook">
           <span class="menu-icon">📕</span>
           <span class="menu-label">错题本</span>
@@ -139,6 +154,9 @@
         <span class="quiz-progress" id="chain-timer">60s</span>
       </header>
       <div class="chain-area">
+        <div class="chain-actions">
+          <button class="ghost-btn chain-undo hidden" id="chain-undo">↩️ 撤回上一步</button>
+        </div>
         <div class="chain-hint" id="chain-hint"></div>
         <div class="chain-targets" id="chain-targets"></div>
         <div class="chain-pool" id="chain-pool"></div>
@@ -190,8 +208,71 @@
       </div>
       <div class="errorbook-list" id="errorbook-list"></div>
     </section>
+
+    <!-- ===== 双语术语卡 ===== -->
+    <section id="screen-cards" class="screen">
+      <header class="topbar">
+        <button class="back-btn" data-goto="screen-menu">← 返回</button>
+        <span class="topbar-title">双语术语卡</span>
+      </header>
+      <div class="cards-filter" id="cards-filter">
+        <button class="seg-btn active" data-cfilter="all">全部</button>
+        <button class="seg-btn" data-cfilter="P&L">P&L</button>
+        <button class="seg-btn" data-cfilter="Ratio">比率</button>
+        <button class="seg-btn" data-cfilter="B/S">B/S</button>
+      </div>
+      <div class="cards-note">每张卡：日本说法 | 英文说法 | 各一句面试口语用法。点「词源」可展开小注（P2 可不看）。</div>
+      <div class="cards-list" id="cards-list"></div>
+    </section>
+
+    <!-- ===== 产出训练：打字 ===== -->
+    <section id="screen-production" class="screen">
+      <header class="topbar">
+        <button class="back-btn" id="prod-back">← 退出</button>
+        <span class="topbar-title">产出训练 · 打字</span>
+        <span class="quiz-progress" id="prod-progress">1/6</span>
+      </header>
+      <div class="quiz-area">
+        <div class="prod-note">把「看懂」变成「说得出」：只看提示，自己打出日/英术语。</div>
+        <div class="question-card" id="prod-question"></div>
+        <div class="feedback-card hidden" id="prod-feedback">
+          <div class="feedback-verdict" id="prod-verdict"></div>
+          <p class="feedback-explain" id="prod-explain"></p>
+          <div class="prod-correct-line hidden" id="prod-correct-line"></div>
+          <div class="readaloud-box" id="prod-readaloud"></div>
+          <button class="primary-btn" id="prod-next">下一题</button>
+        </div>
+        <div class="warmup-done hidden" id="prod-done">
+          <h2>产出训练完成 ⌨️</h2>
+          <p id="prod-score"></p>
+          <button class="primary-btn" data-goto="screen-menu">返回主菜单</button>
+          <button class="ghost-btn" id="prod-again">再练一组</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 面试演练：模板卡 ===== -->
+    <section id="screen-interview" class="screen">
+      <header class="topbar">
+        <button class="back-btn" id="iv-back">← 退出</button>
+        <span class="topbar-title">面试演练 · 模板卡</span>
+        <span class="quiz-progress" id="iv-progress">1/3</span>
+      </header>
+      <div class="quiz-area">
+        <div class="iv-card" id="iv-card"></div>
+        <div class="warmup-done hidden" id="iv-done">
+          <h2>演练完成 🎙️</h2>
+          <p id="iv-summary"></p>
+          <button class="primary-btn" data-goto="screen-menu">返回主菜单</button>
+          <button class="ghost-btn" id="iv-again">再来一轮</button>
+        </div>
+      </div>
+    </section>
   </div>
   <script src="js/data.js"></script>
+  <script src="js/seed-fallback.js"></script>
+  <script src="js/seed.js"></script>
+  <script src="js/scoring.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

@@ -636,3 +636,305 @@ body {
   font-family: inherit;
   font-size: 11px;
 }
+
+/* ===== 链条：撤回上一步（Track A） ===== */
+.chain-actions { margin-bottom: 8px; }
+.chain-actions .chain-undo { margin-top: 0; padding: 9px; font-size: 13px; }
+.chain-undo:hover { border-color: var(--warn); color: var(--warn); }
+
+/* ===== 双语术语卡（Track B1） ===== */
+.cards-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cards-filter .seg-btn {
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: border-color .12s ease, color .12s ease;
+}
+.cards-filter .seg-btn.active {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-weight: 600;
+  border-color: transparent;
+}
+
+.cards-note {
+  background: rgba(79, 140, 255, .08);
+  border: 1px solid rgba(79, 140, 255, .3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.cards-list { display: flex; flex-direction: column; gap: 12px; }
+
+.term-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.term-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.term-card-ja {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.term-card-en {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.term-card-alt {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.term-card-usages {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.term-usage {
+  font-size: 13.5px;
+  line-height: 1.6;
+  border-left: 3px solid var(--border);
+  padding: 4px 10px;
+  color: var(--text);
+}
+
+.term-usage.lang-ja { border-color: var(--accent-2); }
+.term-usage.lang-en { border-color: var(--accent); }
+
+.term-card-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.term-hint-read { }
+.term-hint-warn {
+  color: var(--warn);
+  background: rgba(251, 191, 36, .07);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.term-etymology {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+.term-etymology-toggle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.term-etymology-toggle:hover { color: var(--accent); }
+
+.term-etymology-body {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ===== 产出训练：打字（Track B2） ===== */
+.prod-note {
+  background: rgba(124, 92, 255, .08);
+  border: 1px solid rgba(124, 92, 255, .3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.prod-input-wrap { display: flex; flex-direction: column; gap: 10px; }
+.prod-input-wrap input[type="text"] {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 17px;
+  padding: 13px 14px;
+  outline: none;
+  transition: border-color .12s ease;
+}
+.prod-input-wrap input[type="text"]:focus { border-color: var(--accent); }
+
+.prod-submit {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 13px;
+  cursor: pointer;
+}
+
+/* 朗读对照（Track B2 Read-aloud mirror） */
+.readaloud-box {
+  margin-top: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.readaloud-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.readaloud-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 12px;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color .12s ease;
+}
+.readaloud-toggle:hover { border-color: var(--accent); }
+
+.readaloud-text {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+
+.readaloud-sentence {
+  font-size: 14.5px;
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+.readaloud-sentence + .readaloud-sentence { margin-top: 10px; }
+
+.readaloud-sentence .sen-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+/* 产出反馈 */
+.prod-correct-line {
+  margin-top: 8px;
+  font-size: 13.5px;
+  color: var(--good);
+  background: rgba(52, 211, 153, .08);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* ===== 面试演练：模板卡（Track B3） ===== */
+.iv-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  animation: fadeIn .2s ease;
+}
+
+.iv-topic {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin-bottom: 12px;
+}
+
+.iv-section-title {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  margin: 14px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iv-template {
+  font-size: 15px;
+  line-height: 1.8;
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.iv-template .var {
+  color: var(--warn);
+  background: rgba(251, 191, 36, .1);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.iv-vars-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.iv-var-row {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.iv-var-row b { color: var(--warn); font-weight: 700; }
+
+.iv-followup {
+  font-size: 14px;
+  border-left: 3px solid var(--accent);
+  padding: 6px 12px;
+  color: var(--text);
+  background: rgba(79, 140, 255, .06);
+  border-radius: 0 8px 8px 0;
+}
+
+.iv-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.iv-actions .primary-btn, .iv-actions .ghost-btn { margin-top: 0; }
+
+.iv-key-row {
+  font-size: 13.5px;
+  color: var(--good);
+  margin-top: 4px;
+}
