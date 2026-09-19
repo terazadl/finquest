@@ -13,6 +13,8 @@
     chapterBest: {}, // chapterId -> { correct, total, done }
   };
 
+  let quizMode = "choice"; // 'choice' | 'self'
+
   /* 未完成的章节进度（本次会话内） */
   let quiz = null; // { chapterId, questions, index, correct, total, done:Set }
 
@@ -26,7 +28,7 @@
     } catch (e) {
       /* ignore */
     }
-    return { xp: 0, best: {} };
+    return { xp: 0, best: {}, mistakes: {} };
   }
 
   function save() {
@@ -45,8 +47,44 @@
 
   function resetProgress() {
     localStorage.removeItem(STORE_KEY);
-    state.saved = { xp: 0, best: {} };
+    state.saved = { xp: 0, best: {}, mistakes: {} };
     refreshPlayer();
+  }
+
+  /* ---------- 错题记录 ---------- */
+  function qidOf(chapterId, uiIndex) {
+    return chapterId + ":" + uiIndex;
+  }
+
+  function recordMistake(chapterId, uiIndex) {
+    const key = qidOf(chapterId, uiIndex);
+    if (!state.saved.mistakes) state.saved.mistakes = {};
+    if (!state.saved.mistakes[key]) {
+      state.saved.mistakes[key] = { count: 0, lastAt: Date.now() };
+    }
+    state.saved.mistakes[key].count += 1;
+    state.saved.mistakes[key].lastAt = Date.now();
+    save();
+  }
+
+  function clearMistake(chapterId, uiIndex) {
+    const key = qidOf(chapterId, uiIndex);
+    if (state.saved.mistakes) delete state.saved.mistakes[key];
+    save();
+  }
+
+  function mistakeCount() {
+    return state.saved.mistakes ? Object.keys(state.saved.mistakes).length : 0;
+  }
+
+  /* 按错题记录还原题目对象（含解析信息） */
+  function questionFromKey(key) {
+    const [chapterId, ui] = key.split(":");
+    const ch = CHAPTERS.find((c) => c.id === chapterId);
+    if (!ch) return null;
+    const q = ch.questions[Number(ui)];
+    if (!q) return null;
+    return { chapterId, uiIndex: Number(ui), ...q };
   }
 
   /* ---------- 通用工具 ---------- */
@@ -126,8 +164,10 @@
     if (!ch) return;
     quiz = {
       chapterId: id,
+      reviewMode: false,
       questions: ch.questions.map((q, qi) => ({
         ...q,
+        chapterId: id,
         uiIndex: qi,
         shuffleOptions: shuffle(q.options.map((t, ti) => ({ t, ti }))),
       })),
@@ -141,12 +181,69 @@
     renderQuestion();
   }
 
+  /* 考前突击：只刷错题，答对则清除 */
+  function startReviewMode() {
+    const keys = Object.keys(state.saved.mistakes || {});
+    if (keys.length === 0) return;
+    const questions = keys
+      .map(questionFromKey)
+      .filter(Boolean)
+      .map((q) => ({
+        ...q,
+        shuffleOptions: shuffle(q.options.map((t, ti) => ({ t, ti }))),
+      }));
+    if (questions.length === 0) return;
+    const ch = CHAPTERS.find((c) => c.id === questions[0].chapterId);
+    quiz = {
+      chapterId: "review",
+      reviewMode: true,
+      questions,
+      index: 0,
+      correct: 0,
+      total: questions.length,
+      done: new Set(),
+    };
+    $("#quiz-title").textContent = "考前突击 · 错题";
+    showScreen("screen-quiz");
+    renderQuestion();
+  }
+
   function renderQuestion() {
     if (!quiz) return;
     const q = quiz.questions[quiz.index];
     $("#quiz-progress").textContent = (quiz.index + 1) + "/" + quiz.total;
     $("#feedback-card").classList.add("hidden");
     const card = $("#question-card");
+
+    if (quiz.reviewMode) {
+      card.innerHTML =
+        '<span class="q-tag">📕 错题 · ' + q.tag + "</span>" +
+        '<div class="q-text">' + q.q + "</div>" +
+        '<div class="q-options"></div>';
+      const optsWrapR = $(".q-options", card);
+      q.shuffleOptions.forEach((opt) => {
+        const btn = document.createElement("button");
+        btn.className = "q-option";
+        btn.textContent = opt.t;
+        btn.dataset.ti = String(opt.ti);
+        btn.addEventListener("click", () => pickAnswer(btn, opt.ti));
+        optsWrapR.appendChild(btn);
+      });
+      renderShortcutHint(true);
+      return;
+    }
+
+    if (quizMode === "self") {
+      card.innerHTML =
+        '<span class="q-tag">🫥 自测 · ' + q.tag + "</span>" +
+        '<div class="q-text">' + q.q + "</div>" +
+        '<div class="self-prompt">先别急着看答案！在脑中用英语组织你的回答，想好后点击下方按钮对照。</div>' +
+        '<button class="primary-btn" id="btn-show-answer">👁️ 显示答案</button>';
+      $("#btn-show-answer").addEventListener("click", () => showSelfAnswer(q));
+      renderShortcutHint(false);
+      return;
+    }
+
     card.innerHTML =
       '<span class="q-tag">' + q.tag + "</span>" +
       '<div class="q-text">' + q.q + "</div>" +
@@ -160,6 +257,59 @@
       btn.addEventListener("click", () => pickAnswer(btn, opt.ti));
       optsWrap.appendChild(btn);
     });
+    renderShortcutHint(true);
+  }
+
+  function renderShortcutHint(withKeys) {
+    let hint = $(".shortcut-hint", $("#quiz-area-main"));
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.className = "shortcut-hint";
+      $("#quiz-area-main").appendChild(hint);
+    }
+    hint.innerHTML = withKeys
+      ? "快捷键：<kbd>1</kbd>-<kbd>4</kbd> 选择答案 · <kbd>Enter</kbd> 下一题 · <kbd>Esc</kbd> 退出"
+      : "快捷键：<kbd>Enter</kbd> 显示答案 · <kbd>Esc</kbd> 退出";
+  }
+
+  function showSelfAnswer(q) {
+    const card = $("#question-card");
+    card.innerHTML =
+      '<span class="q-tag">🫥 自测 · ' + q.tag + "</span>" +
+      '<div class="q-text">' + q.q + "</div>" +
+      '<div class="self-answer">' +
+      '<div class="self-answer-title">✅ 参考答案（英语口头版）</div>' +
+      '<div class="self-answer-text">' + q.en + "</div>" +
+      '<div class="self-answer-en">💡 ' + q.explain + "</div>" +
+      '<div class="self-verdict-btns">' +
+      '<button class="self-verdict-btn good" id="self-said-ok">✅ 我说对了</button>' +
+      '<button class="self-verdict-btn bad" id="self-said-no">❌ 没答好</button>' +
+      "</div>" +
+      "</div>";
+    $("#self-said-ok").addEventListener("click", () => {
+      quiz.done.add(q.uiIndex);
+      quiz.correct += 1;
+      if (quiz.reviewMode) clearMistake(q.chapterId, q.uiIndex);
+      renderSelfFeedback(true, q);
+    });
+    $("#self-said-no").addEventListener("click", () => {
+      quiz.done.add(q.uiIndex);
+      if (!quiz.reviewMode) recordMistake(q.chapterId, q.uiIndex);
+      renderSelfFeedback(false, q);
+    });
+  }
+
+  function renderSelfFeedback(ok, q) {
+    const fb = $("#feedback-card");
+    fb.classList.remove("hidden");
+    $("#feedback-verdict").textContent = ok ? "✅ 自评正确" : "❌ 标记为错题（已加入错题本）";
+    $("#feedback-verdict").className = "feedback-verdict " + (ok ? "good" : "bad");
+    $("#feedback-explain").textContent = q.explain;
+    $("#feedback-en").innerHTML = "<b>面试英语模板句</b>" + q.en;
+    fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const last = quiz.index === quiz.total - 1;
+    $("#feedback-next").textContent = last ? "查看结果" : "下一题";
+    $("#feedback-next").onclick = last ? finishChapter : nextQuestion;
   }
 
   function pickAnswer(btn, pickedIdx) {
@@ -168,7 +318,12 @@
     quiz.done.add(q.uiIndex);
 
     const isCorrect = pickedIdx === q.answer;
-    if (isCorrect) quiz.correct += 1;
+    if (isCorrect) {
+      quiz.correct += 1;
+      if (quiz.reviewMode) clearMistake(q.chapterId, q.uiIndex);
+    } else if (!quiz.reviewMode) {
+      recordMistake(q.chapterId, q.uiIndex);
+    }
 
     const opts = $all(".q-option", $("#question-card"));
     opts.forEach((b) => (b.disabled = true));
@@ -196,6 +351,34 @@
   }
 
   function finishChapter() {
+    if (quiz.reviewMode) {
+      const remaining = mistakeCount();
+      const cleared = quiz.total - quiz.correct;
+      const gained = quiz.correct * 8;
+      addXp(gained);
+      const rankBefore = rankOf(state.saved.xp - gained);
+      const rankAfter = rankOf(state.saved.xp);
+
+      $("#done-icon").textContent = remaining === 0 ? "🏆" : "💪";
+      $("#done-title").textContent = "考前突击完成";
+      $("#done-score").textContent =
+        "攻克 " + quiz.correct + " / " + quiz.total + " 题" +
+        (remaining > 0 ? "，还剩 " + remaining + " 道错题待复习" : "，错题已全部清零 🎉");
+      $("#done-xp-gain").textContent = gained;
+
+      const lv = $("#levelup-box");
+      if (rankBefore.name !== rankAfter.name) {
+        lv.classList.remove("hidden");
+        $("#levelup-title").textContent = rankAfter.name + " " + rankAfter.icon;
+      } else {
+        lv.classList.add("hidden");
+      }
+      quiz = null;
+      showScreen("screen-chapter-done");
+      refreshPlayer();
+      return;
+    }
+
     const gained = quiz.correct * 8;
     addXp(gained);
     state.saved.best[quiz.chapterId] = {
@@ -587,6 +770,91 @@
     $("#warmup-progress").textContent = "5/5";
   }
 
+  /* ---------- 错题本 ---------- */
+  function renderErrorBook() {
+    const listWrap = $("#errorbook-list");
+    const emptyEl = $("#errorbook-empty");
+    const keys = Object.keys(state.saved.mistakes || {});
+    $("#menu-error-count").textContent = mistakeCount();
+    if (keys.length === 0) {
+      emptyEl.classList.remove("hidden");
+      listWrap.innerHTML = "";
+      $("#btn-review-mode").disabled = true;
+      $("#btn-review-mode").style.opacity = ".5";
+      return;
+    }
+    emptyEl.classList.add("hidden");
+    $("#btn-review-mode").disabled = false;
+    $("#btn-review-mode").style.opacity = "1";
+    listWrap.innerHTML = "";
+    const entries = keys
+      .map((key) => ({
+        key,
+        ...questionFromKey(key),
+        info: state.saved.mistakes[key],
+      }))
+      .filter((e) => e.q)
+      .sort((a, b) => b.info.count - a.info.count);
+    entries.forEach((e) => {
+      const row = document.createElement("div");
+      row.className = "error-row";
+      const chName = CHAPTERS.find((c) => c.id === e.chapterId)?.name || "";
+      row.innerHTML =
+        '<div class="error-row-head">' +
+        '<span class="error-row-chapter">' + chName + "</span>" +
+        '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
+        "</div>" +
+        '<div class="error-row-q">' + e.q + "</div>" +
+        '<div class="error-row-answer">✅ ' + e.en + "</div>";
+      listWrap.appendChild(row);
+    });
+  }
+
+  function clearAllMistakes() {
+    if (confirm("确定清空所有错题记录？")) {
+      state.saved.mistakes = {};
+      save();
+      renderErrorBook();
+    }
+  }
+
+  /* ---------- 快捷键 ---------- */
+  function handleKeydown(e) {
+    const active = document.querySelector(".screen.active")?.id;
+    if (active === "screen-quiz") {
+      if (e.key === "Escape") {
+        quiz = null;
+        showScreen("screen-chapters");
+        return;
+      }
+      const fbHidden = $("#feedback-card").classList.contains("hidden");
+      if (fbHidden) {
+        /* 答题中 */
+        if (quizMode === "self" && !$("#self-said-ok", $("#question-card"))) {
+          /* 自测模式：未显示答案时 Enter 显示答案 */
+          if (e.key === "Enter") {
+            e.preventDefault();
+            $("#btn-show-answer")?.click();
+          }
+          e.preventDefault();
+          return;
+        }
+        const idx = ["1", "2", "3", "4"].indexOf(e.key);
+        if (idx >= 0) {
+          const btns = $all("#question-card .q-option");
+          if (btns[idx] && !btns[idx].disabled) btns[idx].click();
+        }
+        e.preventDefault();
+      } else {
+        /* 反馈中：Enter 下一题 */
+        if (e.key === "Enter") {
+          e.preventDefault();
+          $("#feedback-next").click();
+        }
+      }
+    }
+  }
+
   /* ---------- 事件绑定 ---------- */
   function bindEvents() {
     /* 导航按钮 */
@@ -595,7 +863,20 @@
         const target = btn.getAttribute("data-goto");
         if (target === "screen-chapters") renderChapters();
         if (target === "screen-warmup") startWarmup();
+        if (target === "screen-errorbook") renderErrorBook();
         showScreen(target);
+      });
+    });
+
+    /* 答题模式切换 */
+    $all(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        quizMode = btn.dataset.qmode;
+        $all(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        $("#self-test-note").classList.toggle("hidden", quizMode !== "self");
+        if (quizMode === "self") {
+          $("#quiz-mode-seg").scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       });
     });
 
@@ -608,8 +889,23 @@
     /* 章节完成继续 */
     $("#done-continue").addEventListener("click", () => {
       quiz = null;
+      if ($("#done-title").textContent === "考前突击完成") {
+        renderErrorBook();
+        showScreen("screen-errorbook");
+        return;
+      }
       renderChapters();
       showScreen("screen-chapters");
+    });
+
+    /* 考前突击 */
+    $("#btn-review-mode").addEventListener("click", () => {
+      startReviewMode();
+    });
+
+    /* 清空错题 */
+    $("#btn-clear-errors").addEventListener("click", () => {
+      clearAllMistakes();
     });
 
     /* 链条模式选择 */
@@ -638,6 +934,9 @@
         renderChapters();
       }
     });
+
+    /* 快捷键 */
+    document.addEventListener("keydown", handleKeydown);
 
     /* 随机提示 */
     $("#menu-tip").textContent = TIPS[Math.floor(Math.random() * TIPS.length)];

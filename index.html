@@ -40,6 +40,11 @@
           <span class="menu-label">每日热身前 10 分钟</span>
           <span class="menu-sub">随机题 + 链条，面试前专用</span>
         </button>
+        <button class="menu-btn" data-goto="screen-errorbook">
+          <span class="menu-icon">📕</span>
+          <span class="menu-label">错题本</span>
+          <span class="menu-sub">错题数量 <b id="menu-error-count">0</b> · 考前只刷错题</span>
+        </button>
         <button class="menu-btn" id="btn-reset">
           <span class="menu-icon">🔄</span>
           <span class="menu-label">重置进度</span>
@@ -55,6 +60,14 @@
         <button class="back-btn" data-goto="screen-menu">← 返回</button>
         <span class="topbar-title">闯关模式</span>
       </header>
+      <div class="mode-switch">
+        <span class="mode-switch-label">答题方式</span>
+        <div class="seg" id="quiz-mode-seg">
+          <button class="seg-btn active" data-qmode="choice">选择题</button>
+          <button class="seg-btn" data-qmode="self">自测（隐藏选项）</button>
+        </div>
+      </div>
+      <div class="self-test-note hidden" id="self-test-note">自测模式：不看选项，先在脑中组织英语答案，再点「显示答案」对照，最后自评。</div>
       <div class="chapter-list" id="chapter-list"></div>
     </section>
 
@@ -65,7 +78,7 @@
         <span class="topbar-title" id="quiz-title">章节</span>
         <span class="quiz-progress" id="quiz-progress">1/6</span>
       </header>
-      <div class="quiz-area">
+      <div class="quiz-area" id="quiz-area-main">
         <div class="question-card" id="question-card"></div>
         <div class="feedback-card hidden" id="feedback-card">
           <div class="feedback-verdict" id="feedback-verdict"></div>
@@ -160,6 +173,22 @@
           <button class="primary-btn" data-goto="screen-menu">返回主菜单</button>
         </div>
       </div>
+    </section>
+
+    <!-- ===== 错题本 ===== -->
+    <section id="screen-errorbook" class="screen">
+      <header class="topbar">
+        <button class="back-btn" data-goto="screen-menu">← 返回</button>
+        <span class="topbar-title">错题本</span>
+      </header>
+      <div class="errorbook-actions">
+        <button class="primary-btn" id="btn-review-mode">🎯 考前突击 · 只刷错题</button>
+        <button class="ghost-btn danger" id="btn-clear-errors">🗑️ 清空错题</button>
+      </div>
+      <div class="errorbook-empty hidden" id="errorbook-empty">
+        <p>🎉 暂无错题，继续保持！</p>
+      </div>
+      <div class="errorbook-list" id="errorbook-list"></div>
     </section>
   </div>
   <script src="js/data.js"></script>
