@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>财务面试大师 · FinQuest</title>
+  <meta name="description" content="针对面试的财务知识闯关 RPG 与 P&L 链条拼搭游戏：日美财报口径、关键比率、三张表联动、英语口语表达。">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ===== 主菜单 ===== -->
+    <section id="screen-menu" class="screen active">
+      <header class="hero">
+        <div class="hero-badge">面试专用</div>
+        <h1>财务面试大师</h1>
+        <p class="subtitle">FinQuest · 闯关 RPG ＋ 链条拼搭</p>
+        <div class="player-card">
+          <div class="player-avatar" id="player-avatar">📈</div>
+          <div>
+            <div class="player-title" id="player-title">实习分析师</div>
+            <div class="player-xp">经验 <span id="player-xp">0</span> / <span id="player-xp-next">100</span></div>
+            <div class="xp-bar"><div class="xp-fill" id="xp-fill"></div></div>
+          </div>
+        </div>
+      </header>
+      <nav class="menu">
+        <button class="menu-btn" data-goto="screen-chapters">
+          <span class="menu-icon">⚔️</span>
+          <span class="menu-label">闯关模式</span>
+          <span class="menu-sub">五章财务知识，经验升级</span>
+        </button>
+        <button class="menu-btn" data-goto="screen-chain">
+          <span class="menu-icon">🔗</span>
+          <span class="menu-label">链条拼搭</span>
+          <span class="menu-sub">P&L 排序 · 日英匹配 · 限时</span>
+        </button>
+        <button class="menu-btn" data-goto="screen-warmup">
+          <span class="menu-icon">🔥</span>
+          <span class="menu-label">每日热身前 10 分钟</span>
+          <span class="menu-sub">随机题 + 链条，面试前专用</span>
+        </button>
+        <button class="menu-btn" id="btn-reset">
+          <span class="menu-icon">🔄</span>
+          <span class="menu-label">重置进度</span>
+          <span class="menu-sub">清空本地保存的成绩</span>
+        </button>
+      </nav>
+      <footer class="tip" id="menu-tip">今日提醒：先热身后闯关，效果更好</footer>
+    </section>
+
+    <!-- ===== 章节选择 ===== -->
+    <section id="screen-chapters" class="screen">
+      <header class="topbar">
+        <button class="back-btn" data-goto="screen-menu">← 返回</button>
+        <span class="topbar-title">闯关模式</span>
+      </header>
+      <div class="chapter-list" id="chapter-list"></div>
+    </section>
+
+    <!-- ===== 答题 ===== -->
+    <section id="screen-quiz" class="screen">
+      <header class="topbar">
+        <button class="back-btn" id="quiz-back">← 退出</button>
+        <span class="topbar-title" id="quiz-title">章节</span>
+        <span class="quiz-progress" id="quiz-progress">1/6</span>
+      </header>
+      <div class="quiz-area">
+        <div class="question-card" id="question-card"></div>
+        <div class="feedback-card hidden" id="feedback-card">
+          <div class="feedback-verdict" id="feedback-verdict"></div>
+          <p class="feedback-explain" id="feedback-explain"></p>
+          <p class="feedback-en" id="feedback-en"></p>
+          <button class="primary-btn" id="feedback-next">下一题</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 章节完成 ===== -->
+    <section id="screen-chapter-done" class="screen">
+      <div class="done-card">
+        <div class="done-icon" id="done-icon">🏆</div>
+        <h2 id="done-title">章节完成！</h2>
+        <p class="done-score" id="done-score"></p>
+        <p class="done-xp">获得经验 <span id="done-xp-gain">0</span></p>
+        <div class="levelup hidden" id="levelup-box">🎉 升级了！现在是 <b id="levelup-title"></b></div>
+        <button class="primary-btn" id="done-continue">继续</button>
+      </div>
+    </section>
+
+    <!-- ===== 链条拼搭：模式选择 ===== -->
+    <section id="screen-chain" class="screen">
+      <header class="topbar">
+        <button class="back-btn" data-goto="screen-menu">← 返回</button>
+        <span class="topbar-title">链条拼搭</span>
+      </header>
+      <div class="chain-modes">
+        <button class="mode-btn" data-mode="en">
+          <span class="mode-icon">🔤</span>
+          <b>P&L 链条排序（英文）</b>
+          <span>把损益表科目按正确顺序排好</span>
+        </button>
+        <button class="mode-btn" data-mode="jp">
+          <span class="mode-icon">🇯🇵</span>
+          <b>P&L 链条排序（日文）</b>
+          <span>日本科目名的顺序</span>
+        </button>
+        <button class="mode-btn" data-mode="match">
+          <span class="mode-icon">🔀</span>
+          <b>日英术语匹配</b>
+          <span>日文科目 ↔ 英文说法</span>
+        </button>
+        <button class="mode-btn" data-mode="bs">
+          <span class="mode-icon">⚖️</span>
+          <b>B/S 科目匹配</b>
+          <span>资产负债表借贷两边</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== 链条拼搭：游戏 ===== -->
+    <section id="screen-chain-game" class="screen">
+      <header class="topbar">
+        <button class="back-btn" id="chain-exit">← 退出</button>
+        <span class="topbar-title" id="chain-mode-title">拼搭</span>
+        <span class="quiz-progress" id="chain-timer">60s</span>
+      </header>
+      <div class="chain-area">
+        <div class="chain-hint" id="chain-hint"></div>
+        <div class="chain-targets" id="chain-targets"></div>
+        <div class="chain-pool" id="chain-pool"></div>
+        <div class="chain-result hidden" id="chain-result">
+          <h2 id="chain-result-title">完成！</h2>
+          <p id="chain-result-msg"></p>
+          <button class="primary-btn" id="chain-again">再来一局</button>
+          <button class="ghost-btn" data-goto="screen-chain">换模式</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 每日热身 ===== -->
+    <section id="screen-warmup" class="screen">
+      <header class="topbar">
+        <button class="back-btn" data-goto="screen-menu">← 返回</button>
+        <span class="topbar-title">每日热身 · 5 题</span>
+        <span class="quiz-progress" id="warmup-progress">1/5</span>
+      </header>
+      <div class="quiz-area">
+        <div class="warmup-note">随机抽取历章高频考点，答完给出英文模板句。</div>
+        <div class="question-card" id="warmup-question"></div>
+        <div class="feedback-card hidden" id="warmup-feedback">
+          <div class="feedback-verdict" id="warmup-verdict"></div>
+          <p class="feedback-explain" id="warmup-explain"></p>
+          <p class="feedback-en" id="warmup-en"></p>
+          <button class="primary-btn" id="warmup-next">下一题</button>
+        </div>
+        <div class="warmup-done hidden" id="warmup-done">
+          <h2>热身完毕 🔥</h2>
+          <p id="warmup-score"></p>
+          <button class="primary-btn" data-goto="screen-menu">返回主菜单</button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
