@@ -231,6 +231,25 @@
     });
   }
 
+  /* 单题再产出：错题本每行按钮直达 */
+  function startSingleReview(key) {
+    Promise.resolve(questionFromKey(key)).then(function (q) {
+      if (!q) return;
+      quiz = {
+        chapterId: "review",
+        reviewMode: true,
+        questions: [q],
+        index: 0,
+        correct: 0,
+        total: 1,
+        done: new Set(),
+      };
+      $("#quiz-title").textContent = FinI18n.t("quiz.review_title");
+      showScreen("screen-quiz");
+      renderQuestion();
+    });
+  }
+
   /* 考前突击：产出题（错题里的 Type EN / Type JA / Select JA） */
   function renderReviewProd(q) {
     const card = $("#question-card");
@@ -314,6 +333,59 @@
     $("#feedback-next").onclick = last ? finishChapter : nextQuestion;
   }
 
+  /* 考前突击：选择题错题 → 产出自评（Track C · US-7：清错不能只是再点选项）
+   * 显示原题（无选项），要求先口头/打字组织答案，再展开模板句对照，最后自评。 */
+  function renderReviewMCSelf(q) {
+    const card = $("#question-card");
+    card.innerHTML =
+      '<span class="q-tag">📕 错题 · ' + esc(q.tag) + "</span>" +
+      '<div class="q-text">' + esc(q.q) + "</div>" +
+      '<div class="prod-options" style="margin-top:10px">' +
+      '<div class="self-prompt">' + FinI18n.t("quiz.review_produce_prompt") + "</div>" +
+      '<div class="readaloud-box">' +
+      '<div class="readaloud-hint">🎧 朗读对照：先自己说/默写，再展开模板句逐句核对。</div>' +
+      '<button class="readaloud-toggle" id="review-ra-toggle">👁️ 展开模板句对照</button>' +
+      '<div class="readaloud-text hidden" id="review-ra-text">' +
+      '<div class="readaloud-sentence"><span class="sen-label">EN</span>' + esc(q.en) + "</div>" +
+      (q.explain ? '<div class="readaloud-hint" style="margin-top:8px">💡 ' + esc(q.explain) + "</div>" : "") +
+      "</div>" +
+      "</div>" +
+      '<div class="self-verdict-btns" style="margin-top:12px">' +
+      '<button class="self-verdict-btn good" id="review-mc-ok">' + FinI18n.t("quiz.review_said_ok") + "</button>" +
+      '<button class="self-verdict-btn bad" id="review-mc-no">' + FinI18n.t("quiz.review_keep") + "</button>" +
+      "</div>" +
+      '<div class="shortcut-hint" style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px"><kbd>Esc</kbd> 退出</div>' +
+      "</div>";
+    $("#review-ra-toggle", card).addEventListener("click", function () {
+      $("#review-ra-text", card).classList.toggle("hidden");
+    });
+    $("#review-mc-ok", card).addEventListener("click", function () {
+      quiz.done.add(q.uiIndex);
+      quiz.correct += 1;
+      clearMistake(q.chapterId, q.uiIndex);
+      renderReviewMCSelfFeedback(q, true);
+    });
+    $("#review-mc-no", card).addEventListener("click", function () {
+      quiz.done.add(q.uiIndex);
+      renderReviewMCSelfFeedback(q, false);
+    });
+  }
+
+  function renderReviewMCSelfFeedback(q, ok) {
+    const card = $("#question-card");
+    const last = quiz.index === quiz.total - 1;
+    card.innerHTML =
+      '<div class="feedback-verdict ' + (ok ? "good" : "bad") + '">' +
+      (ok ? "✅ " + FinI18n.t("quiz.review_said_ok") : "❌ " + FinI18n.t("quiz.review_keep")) +
+      "</div>" +
+      '<p class="feedback-explain">' + (ok ? "已经把它从错题本移出。" : "没关系，本轮先保留，之后再刷。") + "</p>" +
+      '<p class="feedback-en"><b>' + FinI18n.t("template_en") + "</b>" + esc(q.en) + "</p>" +
+      '<button class="primary-btn" id="review-mc-next">' + (last ? FinI18n.t("view_result") : FinI18n.t("next")) + "</button>";
+    $("#review-mc-next", card).addEventListener("click", function () {
+      last ? finishChapter() : nextQuestion();
+    });
+  }
+
   function renderQuestion() {
     if (!quiz) return;
     const q = quiz.questions[quiz.index];
@@ -326,20 +398,7 @@
         renderReviewProd(q);
         return;
       }
-      card.innerHTML =
-        '<span class="q-tag">📕 错题 · ' + q.tag + "</span>" +
-        '<div class="q-text">' + q.q + "</div>" +
-        '<div class="q-options"></div>';
-      const optsWrapR = $(".q-options", card);
-      q.shuffleOptions.forEach((opt) => {
-        const btn = document.createElement("button");
-        btn.className = "q-option";
-        btn.textContent = opt.t;
-        btn.dataset.ti = String(opt.ti);
-        btn.addEventListener("click", () => pickAnswer(btn, opt.ti));
-        optsWrapR.appendChild(btn);
-      });
-      renderShortcutHint(true);
+      renderReviewMCSelf(q);
       return;
     }
 
@@ -378,8 +437,8 @@
       $("#quiz-area-main").appendChild(hint);
     }
     hint.innerHTML = withKeys
-      ? "快捷键：<kbd>1</kbd>-<kbd>4</kbd> 选择答案 · <kbd>Enter</kbd> 下一题 · <kbd>Esc</kbd> 退出"
-      : "快捷键：<kbd>Enter</kbd> 显示答案 · <kbd>Esc</kbd> 退出";
+      ? FinI18n.t("shortcut.choice")
+      : FinI18n.t("shortcut.self");
   }
 
   function showSelfAnswer(q) {
@@ -415,10 +474,10 @@
     $("#feedback-verdict").textContent = ok ? "✅ 自评正确" : "❌ 标记为错题（已加入错题本）";
     $("#feedback-verdict").className = "feedback-verdict " + (ok ? "good" : "bad");
     $("#feedback-explain").textContent = q.explain;
-    $("#feedback-en").innerHTML = "<b>面试英语模板句</b>" + q.en;
+    $("#feedback-en").innerHTML = "<b>" + FinI18n.t("template_en") + "</b>" + q.en;
     fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const last = quiz.index === quiz.total - 1;
-    $("#feedback-next").textContent = last ? "查看结果" : "下一题";
+    $("#feedback-next").textContent = last ? FinI18n.t("view_result") : FinI18n.t("next");
     $("#feedback-next").onclick = last ? finishChapter : nextQuestion;
   }
 
@@ -443,15 +502,15 @@
 
     const fb = $("#feedback-card");
     fb.classList.remove("hidden");
-    $("#feedback-verdict").textContent = isCorrect ? "✅ 正确" : "❌ 答错了";
+    $("#feedback-verdict").textContent = isCorrect ? FinI18n.t("correct") : FinI18n.t("wrong");
     $("#feedback-verdict").className = "feedback-verdict " + (isCorrect ? "good" : "bad");
     $("#feedback-explain").textContent = q.explain;
     $("#feedback-en").innerHTML =
-      "<b>面试英语模板句</b>" + q.en;
+      "<b>" + FinI18n.t("template_en") + "</b>" + q.en;
     fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     const last = quiz.index === quiz.total - 1;
-    $("#feedback-next").textContent = last ? "查看结果" : "下一题";
+    $("#feedback-next").textContent = last ? FinI18n.t("view_result") : FinI18n.t("next");
     $("#feedback-next").onclick = last ? finishChapter : nextQuestion;
   }
 
@@ -567,13 +626,7 @@
 
   function renderChain() {
     chain.lastMove = null;
-    const hintMap = {
-      en: "把英文损益表科目按正确顺序放入槽位",
-      jp: "把日文损益表科目按正确顺序放入槽位",
-      match: "点击英文术语，放入对应的日文科目下方",
-      bs: "判断每个科目属于资产，还是负债・纯资产",
-    };
-    $("#chain-hint").textContent = hintMap[chain.mode];
+    $("#chain-hint").textContent = chainHintDefault();
 
     /* Targets */
     const targetsWrap = $("#chain-targets");
@@ -743,7 +796,7 @@
     }
     chain.lastMove = null;
     chain.activeSlot = -1;
-    showTemporaryHint("↩️ 已撤回上一步，可以重新放置");
+    showTemporaryHint(FinI18n.t("chain.undo_done"));
     refreshUndoButton();
     syncSlotViews();
   }
@@ -774,24 +827,31 @@
       const bs = BS_ITEMS.find((it) => it.jp + " · " + it.en === targetItem);
       if (bs) {
         const correctSide = bs.side === "asset" ? "資産" : "負債・純資産";
-        msg = "❌ 「" + bs.jp + "」属于「" + correctSide + "」，不是「" + t.name + "」";
+        msg = FinI18n.t("chain.wrong_side", { item: bs.jp, side: correctSide, target: t.name });
       }
     } else if (chain.mode === "match") {
-      msg =
-        "❌ 第 " + (ti + 1) + " 位「" + t.name + "」应对应「" + t.expect + "」，不是「" + targetItem + "」";
+      msg = FinI18n.t("chain.wrong_match", { n: ti + 1, name: t.name, expect: t.expect, got: targetItem });
     } else {
       /* en / jp：该槽位（order=ti）对应的正确科目名 */
       const correct = chain.targets.find((x) => x.order === t.order);
-      msg =
-        "❌ 第 " + (ti + 1) + " 位应该是「" + correct.name + "」，不是「" + targetItem + "」。点「↩️ 撤回上一步」重放";
+      msg = FinI18n.t("chain.wrong_pos", { n: ti + 1, correct: correct.name, got: targetItem });
     }
     if (msg) showTemporaryHint(msg);
     setTimeout(() => {
       cardEl.classList.remove("wrong-flash");
-      if (chain.mode === "bs") showTemporaryHint("判断科目属于哪一边，答错会提示正确答案；可用撤销重放");
-      else if (chain.mode === "match") showTemporaryHint("点击英文术语，放入对应的日文科目下方；答错可用撤销重放");
-      else showTemporaryHint("把科目按正确顺序放入槽位；答错会提示正确配对，可用撤销重放");
+      showTemporaryHint(chainHintDefault());
     }, 2500);
+  }
+
+  function chainHintDefault() {
+    if (!chain) return "";
+    return chain.mode === "bs"
+      ? FinI18n.t("chain.hint_bs")
+      : chain.mode === "match"
+        ? FinI18n.t("chain.hint_match")
+        : chain.mode === "jp"
+          ? FinI18n.t("chain.hint_jp")
+          : FinI18n.t("chain.hint_en");
   }
 
   function showTemporaryHint(msg) {
@@ -800,12 +860,7 @@
     el.style.color = "var(--bad)";
     setTimeout(() => {
       el.style.color = "";
-      el.textContent =
-        chain.mode === "bs"
-          ? "判断每个科目属于资产，还是负债・纯资产"
-          : chain.mode === "match"
-            ? "点击英文术语，放入对应的日文科目下方"
-            : "把科目按正确顺序放入槽位";
+      el.textContent = chainHintDefault();
     }, 2000);
   }
 
@@ -836,11 +891,10 @@
     $("#chain-result").classList.remove("hidden");
     $("#chain-result-title").textContent = msg;
     $("#chain-result-msg").textContent = ok
-      ? "全部正确，+10 经验。日英链条已刻进肌肉记忆。"
-      : "看错的部分，再试一局。";
+      ? FinI18n.t("chain.win_msg")
+      : FinI18n.t("again");
     $("#chain-result").scrollIntoView({ behavior: "smooth", block: "center" });
     refreshPlayer();
-    const extra = ok ? " 你获得了 +10 经验。" : "";
     if (!ok) {
       /* 展示正确答案 */
       let explain = "";
@@ -852,12 +906,12 @@
         explain =
           "资产侧：現金、売掛金、棚卸資産、有形固定資産、のれん；负债/权益侧：借入金、社債、資本金、利益剰余金、自己株式。";
       const msgEl = $("#chain-result-msg");
-      msgEl.textContent = msg + extra + " " + explain;
+      msgEl.textContent = msg + " " + explain;
     }
   }
 
-  /* ---------- 每日热身 ---------- */
-  let warmup = null;
+  /* ---------- 每日热身（Track C：混入产出题 + 分类统计） ---------- */
+  let warmup = null; // { questions, index, recogCorrect, prodCorrect, total, recogTotal, prodTotal }
 
   function startWarmup() {
     const all = [];
@@ -866,18 +920,36 @@
         all.push({ ...q, chapterId: ch.id, uiIndex: qi })
       )
     );
-    const picked = shuffle(all).slice(0, 5);
-    warmup = {
-      questions: picked.map((q) => ({
+    const picks = [];
+    const mcPool = shuffle(all);
+    /* 4 道识别题 */
+    picks.push.apply(
+      picks,
+      mcPool.slice(0, 4).map((q) => ({
         ...q,
+        isProd: false,
         shuffleOptions: shuffle(q.options.map((t, ti) => ({ t, ti }))),
-      })),
-      index: 0,
-      correct: 0,
-      total: picked.length,
-    };
-    showScreen("screen-warmup");
-    renderWarmupQuestion();
+      }))
+    );
+    /* 2 道产出题：优先取 type_en / select_ja（select 在移动端也能点），mix type_ja */
+    FinSeedLoader.ready().then(function ({ data }) {
+      const prodPool = shuffle(data.productionItems || []);
+      prodPool.slice(0, 2).forEach(function (p) {
+        picks.push({ ...p, isProd: true });
+      });
+      warmup = {
+        questions: shuffle(picks),
+        index: 0,
+        recogCorrect: 0,
+        prodCorrect: 0,
+        total: picks.length,
+        recogTotal: picks.filter((q) => !q.isProd).length,
+        prodTotal: picks.filter((q) => q.isProd).length,
+      };
+      $("#warmup-progress").textContent = "1/" + warmup.total;
+      showScreen("screen-warmup");
+      renderWarmupQuestion();
+    });
   }
 
   function renderWarmupQuestion() {
@@ -887,9 +959,58 @@
     $("#warmup-feedback").classList.add("hidden");
     $("#warmup-done").classList.add("hidden");
     const card = $("#warmup-question");
+    card.classList.remove("hidden");
+
+    if (q.isProd) {
+      const typeLabel =
+        q.type === "type_en" ? FinI18n.t("prod.type_en") : q.type === "type_ja" ? FinI18n.t("prod.type_ja") : FinI18n.t("prod.select");
+      card.innerHTML =
+        '<span class="q-tag">⚡ 热身 · ' + typeLabel + "</span>" +
+        '<div class="q-text">' + esc(q.cue) + "</div>" +
+        (q.cueJa ? '<div class="prod-hint">🇯🇵 ' + esc(q.cueJa) + "</div>" : "") +
+        '<div class="prod-input-area"></div>';
+      const area = $(".prod-input-area", card);
+      if (q.type === "select_ja") {
+        const optWrap = document.createElement("div");
+        optWrap.className = "prod-options";
+        (q.options || []).forEach(function (opt) {
+          const btn = document.createElement("button");
+          btn.className = "q-option";
+          btn.textContent = opt;
+          btn.dataset.oi = opt;
+          btn.addEventListener("click", function () {
+            submitWarmupProd(null, opt);
+          });
+          optWrap.appendChild(btn);
+        });
+        area.appendChild(optWrap);
+      } else {
+        const inputWrap = document.createElement("div");
+        inputWrap.className = "prod-input-wrap";
+        inputWrap.innerHTML =
+          '<input type="text" id="warmup-prod-input" placeholder="' +
+          (q.type === "type_en" ? "Type English…" : "日本語で入力…") +
+          '" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+          '<button class="prod-submit" id="warmup-prod-submit">' + FinI18n.t("prod.submit") + "</button>";
+        area.appendChild(inputWrap);
+        const input = $("#warmup-prod-input", card);
+        input.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submitWarmupProd(input.value, null);
+          }
+        });
+        $("#warmup-prod-submit", card).addEventListener("click", function () {
+          submitWarmupProd(input.value, null);
+        });
+        input.focus();
+      }
+      return;
+    }
+
     card.innerHTML =
-      '<span class="q-tag">' + q.tag + "</span>" +
-      '<div class="q-text">' + q.q + "</div>" +
+      '<span class="q-tag">⚡ 热身 · ' + esc(q.tag) + "</span>" +
+      '<div class="q-text">' + esc(q.q) + "</div>" +
       '<div class="q-options"></div>';
     const optsWrap = $(".q-options", card);
     q.shuffleOptions.forEach((opt) => {
@@ -902,10 +1023,47 @@
     });
   }
 
+  /* 热身产出题提交（打字判分或选项） */
+  function submitWarmupProd(val, opt) {
+    const q = warmup.questions[warmup.index];
+    let ok;
+    if (opt) {
+      ok = q.accepted.includes(opt);
+      const opts = $all(".q-option", $("#warmup-question"));
+      opts.forEach(function (b) {
+        b.disabled = true;
+        b.classList.toggle("correct", q.accepted.includes(b.textContent));
+        b.classList.toggle("wrong", b.textContent === opt && !ok);
+      });
+    } else {
+      const judge = q.type === "type_ja" ? FinScore.judgeJa : FinScore.judgeEn;
+      const res = judge(val, q.accepted);
+      ok = res.ok;
+      const input = $("#warmup-prod-input");
+      if (input) input.disabled = true;
+    }
+    if (ok) warmup.prodCorrect += 1;
+
+    const fb = $("#warmup-feedback");
+    fb.classList.remove("hidden");
+    $("#warmup-verdict").textContent = ok ? FinI18n.t("correct") : FinI18n.t("prod.deviation");
+    $("#warmup-verdict").className = "feedback-verdict " + (ok ? "good" : "bad");
+    $("#warmup-explain").textContent = q.feedback || "";
+    $("#warmup-en").innerHTML = "<b>" + FinI18n.t("answer_ref") + "</b>" + esc(q.accepted.join(" / "));
+    fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    const last = warmup.index === warmup.total - 1;
+    $("#warmup-next").textContent = last ? FinI18n.t("finish") : FinI18n.t("next");
+    $("#warmup-next").onclick = last ? finishWarmup : () => {
+      warmup.index += 1;
+      renderWarmupQuestion();
+    };
+  }
+
   function pickWarmupAnswer(btn, pickedIdx) {
     const q = warmup.questions[warmup.index];
     const isCorrect = pickedIdx === q.answer;
-    if (isCorrect) warmup.correct += 1;
+    if (isCorrect) warmup.recogCorrect += 1;
     const opts = $all(".q-option", $("#warmup-question"));
     opts.forEach((b) => (b.disabled = true));
     const correctBtn = $('.q-option[data-ti="' + q.answer + '"]', $("#warmup-question"));
@@ -914,14 +1072,14 @@
 
     const fb = $("#warmup-feedback");
     fb.classList.remove("hidden");
-    $("#warmup-verdict").textContent = isCorrect ? "✅ 正确" : "❌ 答错了";
+    $("#warmup-verdict").textContent = isCorrect ? FinI18n.t("correct") : FinI18n.t("wrong");
     $("#warmup-verdict").className = "feedback-verdict " + (isCorrect ? "good" : "bad");
     $("#warmup-explain").textContent = q.explain;
-    $("#warmup-en").innerHTML = "<b>面试英语模板句</b>" + q.en;
+    $("#warmup-en").innerHTML = "<b>" + FinI18n.t("template_en") + "</b>" + esc(q.en);
     fb.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     const last = warmup.index === warmup.total - 1;
-    $("#warmup-next").textContent = last ? "完成" : "下一题";
+    $("#warmup-next").textContent = last ? FinI18n.t("finish") : FinI18n.t("next");
     $("#warmup-next").onclick = last ? finishWarmup : () => {
       warmup.index += 1;
       renderWarmupQuestion();
@@ -932,9 +1090,11 @@
     $("#warmup-feedback").classList.add("hidden");
     $("#warmup-question").classList.add("hidden");
     $("#warmup-done").classList.remove("hidden");
-    $("#warmup-score").textContent =
-      "答对 " + warmup.correct + " / " + warmup.total + " 题。面试开场前 10 分钟，过一遍模板句。";
-    $("#warmup-progress").textContent = "5/5";
+    $("#warmup-score").textContent = FinI18n.t("warmup.score", {
+      a: "" + warmup.recogCorrect, b: "" + warmup.recogTotal,
+      c: "" + warmup.prodCorrect, d: "" + warmup.prodTotal,
+    });
+    $("#warmup-progress").textContent = warmup.total + "/" + warmup.total;
   }
 
   /* ---------- 错题本 ---------- */
@@ -971,23 +1131,34 @@
           row.innerHTML =
             '<div class="error-row-head">' +
             '<span class="error-row-chapter">' + typeLabel + "</span>" +
-            '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
+            '<span class="error-row-count">' + FinI18n.t("errorbook.wrong_count", { n: e.info.count }) + "</span>" +
             "</div>" +
             '<div class="error-row-q">' + esc(e.cue) + "</div>" +
-            '<div class="error-row-answer">✅ ' + esc(e.accepted.join(" / ")) + "</div>" +
-            '<div class="error-row-en">考前突击会要求再产出（打字/选择），答对自动移出。</div>';
+            '<div class="error-row-answer">✅ ' + esc((e.accepted || []).join(" / ")) + "</div>" +
+            '<button class="errorbook-repro" data-key="' + e.key + '">' + FinI18n.t("errorbook.reproduce") + "</button>" +
+            '<div class="error-row-en">' + FinI18n.t("errorbook.prod_will") + "</div>";
           listWrap.appendChild(row);
+          const b = row.querySelector(".errorbook-repro");
+          b.addEventListener("click", function () {
+            startSingleReview(b.getAttribute("data-key"));
+          });
           return;
         }
         const chName = CHAPTERS.find((c) => c.id === e.chapterId)?.name || "";
         row.innerHTML =
           '<div class="error-row-head">' +
           '<span class="error-row-chapter">' + chName + "</span>" +
-          '<span class="error-row-count">错 ' + e.info.count + " 次</span>" +
+          '<span class="error-row-count">' + FinI18n.t("errorbook.wrong_count", { n: e.info.count }) + "</span>" +
           "</div>" +
           '<div class="error-row-q">' + esc(e.q) + "</div>" +
-          '<div class="error-row-answer">✅ ' + esc(e.en || "") + "</div>";
+          '<div class="error-row-answer">✅ ' + esc(e.en || "") + "</div>" +
+          '<button class="errorbook-repro" data-key="' + e.key + '">' + FinI18n.t("errorbook.reproduce") + "</button>" +
+          '<div class="error-row-en">' + FinI18n.t("errorbook.mc_will") + "</div>";
         listWrap.appendChild(row);
+        const b = row.querySelector(".errorbook-repro");
+        b.addEventListener("click", function () {
+          startSingleReview(b.getAttribute("data-key"));
+        });
       });
     });
   }
@@ -1302,6 +1473,129 @@
     $("#iv-progress").textContent = iv.total + "/" + iv.total;
   }
 
+  /* ---------- Track E · 模拟面试（连答 + 追问 + 计时 + 结束页） ---------- */
+  let mock = null; // { items, index, phase, done, total, timer, interval }
+
+  const MOCK_SECONDS = 300;
+
+  function startMock() {
+    FinSeedLoader.ready().then(function ({ data }) {
+      const all = data.interviewCards || [];
+      if (all.length === 0) return;
+      const items = shuffle(all).slice(0, 4);
+      mock = {
+        items,
+        index: 0,
+        phase: "template", // 'template' | 'followup'
+        done: 0,
+        total: items.length,
+        timer: MOCK_SECONDS,
+        interval: null,
+      };
+      $("#mock-progress") && ($("#mock-progress").textContent = "1/" + items.length);
+      showScreen("screen-mock");
+      renderMockQ();
+      startMockTimer();
+    });
+  }
+
+  function renderMockQ() {
+    if (!mock) return;
+    const card = mock.items[mock.index];
+    $("#mock-done").classList.add("hidden");
+    const wrap = $("#mock-card");
+    wrap.classList.remove("hidden");
+    const phase = mock.phase;
+    /* 用户自评按钮文案 */
+    const actionLabel =
+      phase === "template"
+        ? FinI18n.t("mock.see_followup")
+        : FinI18n.t("mock.answered");
+    const phaseLabel =
+      phase === "template" ? FinI18n.t("mock.phase_template") : FinI18n.t("mock.phase_followup");
+    /* 展示模板句或追问 */
+    const body =
+      phase === "template"
+        ? '<div class="iv-section-title">🟦 EN 第一人称模板（朗读后自评）</div>' +
+          '<div class="iv-template">' + escVars(card.templateEn) + "</div>" +
+          '<div class="iv-section-title">🟪 JA 第一人称模板</div>' +
+          '<div class="iv-template">' + escVars(card.templateJa) + "</div>" +
+          '<div class="iv-section-title">🔧 变量示例</div>' +
+          '<div class="iv-vars-grid">' +
+          card.vars.map(function (v) { return '<div class="iv-var-row"><b>' + esc(v) + "</b> → " + esc(varExample(v)) + "</div>"; }).join("") +
+          "</div>"
+        : '<div class="iv-section-title">❓ 追问</div>' +
+          '<div class="iv-followup">EN：' + esc(card.followUpEn) + "<br>JA：" + esc(card.followUpJa) + "</div>";
+    wrap.innerHTML =
+      '<span class="iv-topic">' + esc(card.topic) + " · " + (mock.index + 1) + "/" + mock.total + "</span>" +
+      '<div class="mock-phase" id="mock-phase">' + phaseLabel + "</div>" +
+      body +
+      '<div class="readaloud-box">' +
+      '<div class="readaloud-hint">🎧 朗读对照：先自己读/答，再展开文稿逐句核对。</div>' +
+      '<button class="readaloud-toggle" id="mock-ra-toggle">👁️ 展开文稿对照</button>' +
+      '<div class="readaloud-text hidden" id="mock-ra-text">' +
+      (phase === "template"
+        ? '<div class="readaloud-sentence"><span class="sen-label">EN</span>' + esc(card.templateEn) + "</div>" +
+          '<div class="readaloud-sentence"><span class="sen-label">JA</span>' + esc(card.templateJa) + "</div>"
+        : '<div class="readaloud-sentence"><span class="sen-label">EN</span>' + esc(card.followUpEn) + "</div>" +
+          '<div class="readaloud-sentence"><span class="sen-label">JA</span>' + esc(card.followUpJa) + "</div>") +
+      "</div>" +
+      "</div>" +
+      '<div class="iv-actions">' +
+      '<button class="primary-btn" id="mock-act">' + actionLabel + "</button>" +
+      "</div>";
+    $("#mock-ra-toggle", wrap).addEventListener("click", function () {
+      $("#mock-ra-text", wrap).classList.toggle("hidden");
+    });
+    $("#mock-act", wrap).addEventListener("click", function () {
+      if (mock.phase === "template") {
+        mock.phase = "followup";
+        renderMockQ();
+        return;
+      }
+      mock.done += 1;
+      const last = mock.index === mock.total - 1;
+      if (last) {
+        finishMock();
+      } else {
+        mock.index += 1;
+        mock.phase = "template";
+        renderMockQ();
+      }
+    });
+  }
+
+  function startMockTimer() {
+    if (mock.interval) clearInterval(mock.interval);
+    mock.interval = setInterval(function () {
+      mock.timer -= 1;
+      const t = $("#mock-timer");
+      if (t) t.textContent = FinI18n.t("mock.sec", { s: mock.timer });
+      if (mock.timer <= 0) {
+        clearInterval(mock.interval);
+        finishMock(true);
+      }
+    }, 1000);
+  }
+
+  function finishMock(timeout) {
+    if (mock.interval) clearInterval(mock.interval);
+    const m = mock;
+    mock = null;
+    $("#mock-card").classList.add("hidden");
+    $("#mock-done").classList.remove("hidden");
+    const topics = m.items.map(function (c) { return c.topic; }).join(" · ");
+    let keys = [];
+    m.items.forEach(function (c) { keys = keys.concat(c.keys); });
+    const uniq = Array.from(new Set(keys)).slice(0, 12).join(" / ");
+    $("#mock-summary").innerHTML =
+      FinI18n.t("mock.done_summary", { a: m.done, b: m.total, topics: esc(topics) }) +
+      (timeout ? "<br>" + FinI18n.t("mock.timeout_hint") : "") +
+      "<br>" + FinI18n.t("mock.weak") + esc(uniq);
+    const t = $("#mock-timer");
+    if (t) t.textContent = "0s";
+  }
+
   /* ---------- Track B · 展示辅助 ---------- */
   function esc(s) {
     return String(s == null ? "" : s)
@@ -1338,6 +1632,12 @@
     }
     if (active === "screen-interview" && e.key === "Escape") {
       interview = null;
+      showScreen("screen-menu");
+      return;
+    }
+    if (active === "screen-mock" && e.key === "Escape") {
+      if (mock && mock.interval) clearInterval(mock.interval);
+      mock = null;
       showScreen("screen-menu");
       return;
     }
@@ -1387,6 +1687,7 @@
         if (target === "screen-cards") renderCards("all");
         if (target === "screen-production") startProduction();
         if (target === "screen-interview") startInterview();
+        if (target === "screen-mock") startMock();
         showScreen(target);
       });
     });
@@ -1481,6 +1782,24 @@
       startInterview();
     });
 
+    /* Track E：模拟面试 */
+    $("#mock-back").addEventListener("click", () => {
+      if (mock && mock.interval) clearInterval(mock.interval);
+      mock = null;
+      showScreen("screen-menu");
+    });
+    $("#mock-again").addEventListener("click", () => {
+      startMock();
+    });
+
+    /* 语言切换（US-10） */
+    $all(".lang-switch .seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        FinI18n.setLang(btn.dataset.lang);
+        $all(".lang-switch .seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+
     /* 重置进度 */
     $("#btn-reset").addEventListener("click", () => {
       if (confirm("确定重置全部进度和经验？")) {
@@ -1500,8 +1819,31 @@
   function init() {
     bindEvents();
     refreshPlayer();
+    FinI18n.applyStatic();
+    /* 语言高亮 */
+    const cur = FinI18n.lang();
+    $all(".lang-switch .seg-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.lang === cur);
+    });
     showScreen("screen-menu");
   }
+
+  /* 语言切换后重渲染当前屏的动态内容（章节名、菜单提示等） */
+  window.FinQuestRefreshLang = function () {
+    const active = document.querySelector(".screen.active")?.id;
+    if (active === "screen-menu") {
+      $("#menu-tip").textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+    }
+    if (active === "screen-chapters") renderChapters();
+    if (active === "screen-quiz" && quiz) renderQuestion();
+    if (active === "screen-chain") { }
+    if (active === "screen-warmup" && warmup) renderWarmupQuestion();
+    if (active === "screen-cards") renderCards(cardsFilter);
+    if (active === "screen-errorbook") renderErrorBook();
+    if (active === "screen-production" && prod) renderProductionQ();
+    if (active === "screen-interview" && interview) renderInterviewQ();
+    if (active === "screen-mock" && mock) renderMockQ();
+  };
 
   document.addEventListener("DOMContentLoaded", init);
 })();
